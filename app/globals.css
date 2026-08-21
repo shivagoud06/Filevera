@@ -1,8 +1,35 @@
+main.bg-slate-50 {
+  min-height: auto !important;
+}
+
+main.bg-slate-50>article,
+main.bg-slate-50>section {
+  padding-top: 2rem;
+  padding-bottom: 2.5rem;
+}
+
+input,
+select,
+textarea {
+  color: var(--filevera-ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--filevera-muted);
+  opacity: 0.85;
+}
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #111827;
+  --filevera-sky: #38bdf8;
+  --filevera-sky-dark: #0284c7;
+  --filevera-ink: #111827;
+  --filevera-muted: #475569;
+  --filevera-border: #e2e8f0;
 }
 
 @theme inline {
@@ -22,5 +49,70 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
+}
+
+/* Keep legacy utility classes aligned with the Filevera palette. */
+.bg-blue-700 {
+  background-color: var(--filevera-sky) !important;
+}
+
+.text-sky-500 {
+  color: var(--filevera-sky) !important;
+}
+
+.bg-blue-800 {
+  background-color: var(--filevera-sky-dark) !important;
+}
+
+.text-blue-600,
+.text-blue-700,
+.text-blue-800 {
+  color: var(--filevera-sky-dark) !important;
+}
+
+.border-blue-300,
+.border-blue-700 {
+  border-color: var(--filevera-sky) !important;
+}
+
+.text-slate-500,
+.text-slate-600 {
+  color: var(--filevera-muted) !important;
+}
+
+.border-slate-200,
+.border-slate-300 {
+  border-color: var(--filevera-border) !important;
+}
+
+button.bg-blue-700,
+a.bg-blue-700 {
+  color: #ffffff !important;
+}
+
+body:has(.auth-page)>footer {
+  display: none;
+}
+
+.auth-shell {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.auth-page {
+  min-height: 0;
+  flex: 1;
+  background: #ffffff !important;
+}
+
+.auth-copyright {
+  flex: none;
+  padding: 0.75rem 1rem 1rem;
+  color: #64748b;
+  font-size: 0.8125rem;
+  text-align: center;
 }

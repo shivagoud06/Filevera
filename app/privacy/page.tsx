@@ -1,0 +1,13 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import SiteHeader from "@/app/components/site-header";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata("/privacy", "Privacy Policy | Filevera", "How Filevera handles accounts, uploaded files, cookies, and service operations.");
+const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
+
+export default function PrivacyPage() {
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900"><SiteHeader /><article className="mx-auto max-w-3xl px-5 py-12 sm:px-8"><Link href="/" className="text-sm font-semibold text-blue-700">← Back to Filevera</Link><h1 className="mt-5 text-4xl font-bold">Privacy Policy</h1><p className="mt-3 text-sm text-slate-500">Last updated: August 22, 2026</p><div className="mt-8 space-y-8 rounded-2xl border border-slate-200 bg-white p-6 text-sm leading-7 shadow-sm sm:p-10"><section><h2 className="text-xl font-bold">Information we may collect</h2><p className="mt-3">Filevera may process an email address, name, and authentication records when you create an account. Basic technical information may be present in normal server logs. No document contents are used for account profiling.</p></section><section><h2 className="text-xl font-bold">Uploaded files</h2><p className="mt-3">Files are uploaded only to provide the operation you request. PDF and image processing may use temporary server files. Processing code removes its temporary working directory when the operation finishes; transient system or provider backups may follow their own retention policies.</p></section><section><h2 className="text-xl font-bold">Accounts and cookies</h2><p className="mt-3">Authentication uses session cookies managed by Better Auth. Account information is used to sign you in and maintain your account. Filevera does not currently configure advertising or third-party analytics cookies.</p></section><section><h2 className="text-xl font-bold">Security and providers</h2><p className="mt-3">Passwords are handled by Better Auth using password hashing and account sessions are stored in the configured SQLite database. Ghostscript and Sharp process files on the application server. Google login and email delivery are not currently configured.</p></section><section><h2 className="text-xl font-bold">Contact</h2><p className="mt-3">For privacy requests, contact {contact ? <a href={`mailto:${contact}`} className="font-semibold text-blue-700 hover:underline">{contact}</a> : "the service operator through the configured production support channel"}.</p></section></div></article></main>
+  );
+}
