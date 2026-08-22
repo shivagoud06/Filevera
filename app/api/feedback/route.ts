@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10));
 
-    const result = getApprovedFeedback(limit, offset);
+    const result = await getApprovedFeedback(limit, offset);
     return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Failed to load feedback" }, { status: 500 });
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Feedback message must be at least 5 characters long." }, { status: 400 });
     }
 
-    const feedback = submitFeedback({
+    const feedback = await submitFeedback({
       userId: session?.user.id || null,
       displayName: finalName,
       rating: numRating,

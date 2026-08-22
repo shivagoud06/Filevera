@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import { getPlan, PlanId, PLANS } from "./plans";
+import { dbQuery } from "./db";
 
 export interface UserUsage {
   userId: string;
@@ -10,66 +10,71 @@ export interface UserUsage {
   updatedAt: number;
 }
 
-const db = new Database(process.env.AUTH_DATABASE_PATH ?? "data/file-tools-auth.sqlite");
-db.pragma("journal_mode = WAL");
-
-// Ensure usage table exists
-db.exec(`
-  CREATE TABLE IF NOT EXISTS user_usage (
-    userId TEXT PRIMARY KEY NOT NULL,
-    plan TEXT NOT NULL DEFAULT 'free',
-    credits INTEGER NOT NULL DEFAULT 100,
-    creditsResetAt INTEGER NOT NULL,
-    subscriptionStatus TEXT NOT NULL DEFAULT 'active',
-    updatedAt INTEGER NOT NULL
-  );
-`);
-
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function ensureUserUsage(userId: string): UserUsage {
+export async function ensureUserUsage(userId: string): Promise<UserUsage> {
   const now = Date.now();
-  const selectStmt = db.prepare("SELECT * FROM user_usage WHERE userId = ?");
-  const existing = selectStmt.get(userId) as UserUsage | undefined;
+  const res = await dbQuery<{
+    userId: string;
+    plan: PlanId;
+    credits: number | string;
+    creditsResetAt: number | string;
+    subscriptionStatus: string;
+    updatedAt: number | string;
+  }>(
+    'SELECT "userId", plan, credits, "creditsResetAt", "subscriptionStatus", "updatedAt" FROM user_usage WHERE "userId" = $1',
+    [userId]
+  );
+  const existing = res.rows[0];
 
   if (!existing) {
     const starterCredits = PLANS.free.starterCredits;
     const resetAt = now + THIRTY_DAYS_MS;
-    const insertStmt = db.prepare(`
-      INSERT INTO user_usage (userId, plan, credits, creditsResetAt, subscriptionStatus, updatedAt)
-      VALUES (?, 'free', ?, ?, 'active', ?)
-    `);
-    insertStmt.run(userId, starterCredits, resetAt, now);
+    await dbQuery(
+      `INSERT INTO user_usage ("userId", plan, credits, "creditsResetAt", "subscriptionStatus", "updatedAt")
+       VALUES ($1, 'free', $2, $3, 'active', $4)
+       ON CONFLICT ("userId") DO NOTHING`,
+      [userId, starterCredits, resetAt, now]
+    );
     return {
       userId,
       plan: "free",
       credits: starterCredits,
       creditsResetAt: resetAt,
       subscriptionStatus: "active",
-      updatedAt: now
+      updatedAt: now,
     };
   }
 
   // Check if monthly renewal period has elapsed
-  if (now >= existing.creditsResetAt) {
+  if (now >= Number(existing.creditsResetAt)) {
     const planConfig = getPlan(existing.plan);
     const renewedCredits = planConfig.monthlyCredits;
     const newResetAt = now + THIRTY_DAYS_MS;
-    const updateResetStmt = db.prepare(`
-      UPDATE user_usage 
-      SET credits = ?, creditsResetAt = ?, updatedAt = ?
-      WHERE userId = ?
-    `);
-    updateResetStmt.run(renewedCredits, newResetAt, now, userId);
+    await dbQuery(
+      `UPDATE user_usage 
+       SET credits = $1, "creditsResetAt" = $2, "updatedAt" = $3
+       WHERE "userId" = $4`,
+      [renewedCredits, newResetAt, now, userId]
+    );
     return {
-      ...existing,
+      userId: existing.userId,
+      plan: existing.plan,
       credits: renewedCredits,
       creditsResetAt: newResetAt,
-      updatedAt: now
+      subscriptionStatus: existing.subscriptionStatus,
+      updatedAt: now,
     };
   }
 
-  return existing;
+  return {
+    userId: existing.userId,
+    plan: existing.plan,
+    credits: Number(existing.credits),
+    creditsResetAt: Number(existing.creditsResetAt),
+    subscriptionStatus: existing.subscriptionStatus,
+    updatedAt: Number(existing.updatedAt),
+  };
 }
 
 export function calculateCreditCost(tool: string, fileCount = 1, totalBytes = 0): number {
@@ -79,30 +84,39 @@ export function calculateCreditCost(tool: string, fileCount = 1, totalBytes = 0)
   return baseCost + additionalFiles + sizeCost;
 }
 
-export function deductUserCredits(userId: string, amount: number): { success: boolean; remaining: number; error?: string } {
-  const usage = ensureUserUsage(userId);
+export async function deductUserCredits(
+  userId: string,
+  amount: number
+): Promise<{ success: boolean; remaining: number; error?: string }> {
+  const usage = await ensureUserUsage(userId);
   if (usage.credits < amount) {
     return {
       success: false,
       remaining: usage.credits,
-      error: `Insufficient credits. This operation requires ${amount} credit${amount === 1 ? "" : "s"}, but you have ${usage.credits} remaining.`
+      error: `Insufficient credits. This operation requires ${amount} credit${
+        amount === 1 ? "" : "s"
+      }, but you have ${usage.credits} remaining.`,
     };
   }
 
   const newCredits = usage.credits - amount;
   const now = Date.now();
-  const updateStmt = db.prepare("UPDATE user_usage SET credits = ?, updatedAt = ? WHERE userId = ?");
-  updateStmt.run(newCredits, now, userId);
+  await dbQuery(
+    'UPDATE user_usage SET credits = $1, "updatedAt" = $2 WHERE "userId" = $3',
+    [newCredits, now, userId]
+  );
 
   return {
     success: true,
-    remaining: newCredits
+    remaining: newCredits,
   };
 }
 
-export function refundUserCredits(userId: string, amount: number): void {
+export async function refundUserCredits(userId: string, amount: number): Promise<void> {
   if (amount <= 0) return;
   const now = Date.now();
-  const updateStmt = db.prepare("UPDATE user_usage SET credits = credits + ?, updatedAt = ? WHERE userId = ?");
-  updateStmt.run(amount, now, userId);
+  await dbQuery(
+    'UPDATE user_usage SET credits = credits + $1, "updatedAt" = $2 WHERE "userId" = $3',
+    [amount, now, userId]
+  );
 }

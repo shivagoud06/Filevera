@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const usage = ensureUserUsage(session.user.id);
+    const usage = await ensureUserUsage(session.user.id);
     const plan = getPlan(usage.plan);
 
     return NextResponse.json({

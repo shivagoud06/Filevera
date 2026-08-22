@@ -1,5 +1,5 @@
-import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
+import { dbQuery } from "./db";
 
 export interface SupportTicket {
   id: string;
@@ -12,73 +12,89 @@ export interface SupportTicket {
   createdAt: number;
 }
 
-const db = new Database(process.env.AUTH_DATABASE_PATH ?? "data/file-tools-auth.sqlite");
-db.pragma("journal_mode = WAL");
-
-// Ensure support_ticket table exists
-db.exec(`
-  CREATE TABLE IF NOT EXISTS support_ticket (
-    id TEXT PRIMARY KEY NOT NULL,
-    userId TEXT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    category TEXT NOT NULL,
-    message TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',
-    createdAt INTEGER NOT NULL
-  );
-`);
-
-export function createSupportTicket(data: {
+export async function createSupportTicket(data: {
   userId?: string | null;
   name: string;
   email: string;
   category: string;
   message: string;
-}): SupportTicket {
+}): Promise<SupportTicket> {
   const id = randomUUID();
   const createdAt = Date.now();
   const status = "open";
 
-  const stmt = db.prepare(`
-    INSERT INTO support_ticket (id, userId, name, email, category, message, status, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  const finalName = data.name.trim().slice(0, 100);
+  const finalEmail = data.email.trim().toLowerCase().slice(0, 150);
+  const finalCategory = data.category.trim().slice(0, 50);
+  const finalMessage = data.message.trim().slice(0, 5000);
 
-  stmt.run(
-    id,
-    data.userId || null,
-    data.name.trim().slice(0, 100),
-    data.email.trim().toLowerCase().slice(0, 150),
-    data.category.trim().slice(0, 50),
-    data.message.trim().slice(0, 5000),
-    status,
-    createdAt
+  await dbQuery(
+    `INSERT INTO support_ticket (id, "userId", name, email, category, message, status, "createdAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      id,
+      data.userId || null,
+      finalName,
+      finalEmail,
+      finalCategory,
+      finalMessage,
+      status,
+      createdAt,
+    ]
   );
 
   return {
     id,
     userId: data.userId || null,
-    name: data.name.trim().slice(0, 100),
-    email: data.email.trim().toLowerCase().slice(0, 150),
-    category: data.category.trim().slice(0, 50),
-    message: data.message.trim().slice(0, 5000),
+    name: finalName,
+    email: finalEmail,
+    category: finalCategory,
+    message: finalMessage,
     status,
-    createdAt
+    createdAt,
   };
 }
 
-export function getSupportTickets(status?: string): SupportTicket[] {
+export async function getSupportTickets(status?: string): Promise<SupportTicket[]> {
   if (status) {
-    const stmt = db.prepare("SELECT * FROM support_ticket WHERE status = ? ORDER BY createdAt DESC");
-    return stmt.all(status) as SupportTicket[];
+    const result = await dbQuery<{
+      id: string;
+      userId: string | null;
+      name: string;
+      email: string;
+      category: string;
+      message: string;
+      status: "open" | "in-progress" | "resolved";
+      createdAt: number | string;
+    }>(
+      'SELECT id, "userId", name, email, category, message, status, "createdAt" FROM support_ticket WHERE status = $1 ORDER BY "createdAt" DESC',
+      [status]
+    );
+    return result.rows.map((r) => ({ ...r, createdAt: Number(r.createdAt) }));
   }
-  const stmt = db.prepare("SELECT * FROM support_ticket ORDER BY createdAt DESC");
-  return stmt.all() as SupportTicket[];
+
+  const result = await dbQuery<{
+    id: string;
+    userId: string | null;
+    name: string;
+    email: string;
+    category: string;
+    message: string;
+    status: "open" | "in-progress" | "resolved";
+    createdAt: number | string;
+  }>(
+    'SELECT id, "userId", name, email, category, message, status, "createdAt" FROM support_ticket ORDER BY "createdAt" DESC'
+  );
+  return result.rows.map((r) => ({ ...r, createdAt: Number(r.createdAt) }));
 }
 
-export function updateSupportTicketStatus(id: string, status: "open" | "in-progress" | "resolved"): boolean {
-  const stmt = db.prepare("UPDATE support_ticket SET status = ? WHERE id = ?");
-  const result = stmt.run(status, id);
-  return result.changes > 0;
+export async function updateSupportTicketStatus(
+  id: string,
+  status: "open" | "in-progress" | "resolved"
+): Promise<boolean> {
+  const result = await dbQuery(
+    "UPDATE support_ticket SET status = $1 WHERE id = $2",
+    [status, id]
+  );
+  return (result.rowCount ?? 0) > 0;
 }

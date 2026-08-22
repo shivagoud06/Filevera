@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Message must be at least 10 characters long." }, { status: 400 });
     }
 
-    const ticket = createSupportTicket({
+    const ticket = await createSupportTicket({
       userId: session?.user.id || null,
       name: finalName,
       email: finalEmail,
