@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, DragEvent, useEffect, useState } from "react";
+import ToolShell from "@/app/components/tool-shell";
 
 const MAX_COUNT = 20;
 const ACCEPT = "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp";
@@ -10,8 +10,18 @@ type Format = "original" | "jpeg" | "png" | "webp";
 type Item = { id: string; file: File; preview: string };
 type Result = { name: string; originalName: string; originalWidth: number; originalHeight: number; width: number; height: number; originalSize: number; resizedSize: number; data: string };
 
-function size(value: number) { if (value < 1024) return `${value} B`; if (value < 1024 * 1024) return `${(value / 1024).toFixed(0)} KB`; return `${(value / (1024 * 1024)).toFixed(2)} MB`; }
-function imageUrl(data: string, name: string) { const binary = atob(data); const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0)); const extension = name.split(".").pop(); return URL.createObjectURL(new Blob([bytes], { type: extension === "jpg" ? "image/jpeg" : `image/${extension}` })); }
+function size(value: number) {
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(0)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function imageUrl(data: string, name: string) {
+    const binary = atob(data);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const extension = name.split(".").pop();
+    return URL.createObjectURL(new Blob([bytes], { type: extension === "jpg" ? "image/jpeg" : `image/${extension}` }));
+}
 
 export default function ImageResizerTool() {
     const [items, setItems] = useState<Item[]>([]);
@@ -27,22 +37,319 @@ export default function ImageResizerTool() {
     const [results, setResults] = useState<Result[]>([]);
     const [zipUrl, setZipUrl] = useState("");
 
-    useEffect(() => () => { items.forEach((item) => URL.revokeObjectURL(item.preview)); if (zipUrl) URL.revokeObjectURL(zipUrl); }, [items, zipUrl]);
-    const add = (files: FileList | File[]) => { setError(""); setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } const selected = Array.from(files); if (items.length + selected.length > MAX_COUNT) { setError(`Choose no more than ${MAX_COUNT} images.`); return; } const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || !/\.(jpe?g|png|webp)$/i.test(file.name)); if (invalid) { setError(`${invalid.name} is not a supported image.`); return; } setItems((current) => [...current, ...selected.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, preview: URL.createObjectURL(file) }))]); };
-    const choose = (event: ChangeEvent<HTMLInputElement>) => { if (event.target.files) add(event.target.files); event.target.value = ""; };
-    const drop = (event: DragEvent<HTMLDivElement>) => { event.preventDefault(); setDragging(false); add(event.dataTransfer.files); };
-    const remove = (id: string) => { setItems((current) => { const item = current.find((entry) => entry.id === id); if (item) URL.revokeObjectURL(item.preview); return current.filter((entry) => entry.id !== id); }); setResults([]); };
-    const clear = () => { items.forEach((item) => URL.revokeObjectURL(item.preview)); setItems([]); setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } };
-    const resize = async () => { if (!items.length || processing) return; setProcessing(true); setError(""); setResults([]); try { const body = new FormData(); items.forEach((item) => body.append("files", item.file)); body.append("mode", mode); body.append("format", format); body.append("keepRatio", String(keepRatio)); body.append("width", width); body.append("height", height); body.append("percentage", percentage); const response = await fetch("/api/resize-image", { method: "POST", body }); const payload = await response.json() as { error?: string; results?: Result[]; zip?: string }; if (!response.ok || !payload.results || !payload.zip) throw new Error(payload.error || "Image resizing failed."); setResults(payload.results); const binary = atob(payload.zip); const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0)); setZipUrl(URL.createObjectURL(new Blob([bytes], { type: "application/zip" }))); } catch (caught) { setError(caught instanceof Error ? caught.message : "Image resizing failed."); } finally { setProcessing(false); } };
+    useEffect(() => () => {
+        items.forEach((item) => URL.revokeObjectURL(item.preview));
+        if (zipUrl) URL.revokeObjectURL(zipUrl);
+    }, [items, zipUrl]);
+
+    const add = (files: FileList | File[]) => {
+        setError("");
+        setResults([]);
+        if (zipUrl) {
+            URL.revokeObjectURL(zipUrl);
+            setZipUrl("");
+        }
+        const selected = Array.from(files);
+        if (items.length + selected.length > MAX_COUNT) {
+            setError(`Choose no more than ${MAX_COUNT} images.`);
+            return;
+        }
+        const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || !/\.(jpe?g|png|webp)$/i.test(file.name));
+        if (invalid) {
+            setError(`${invalid.name} is not a supported image.`);
+            return;
+        }
+        setItems((current) => [...current, ...selected.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, preview: URL.createObjectURL(file) }))]);
+    };
+
+    const choose = (event: ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) add(event.target.files);
+        event.target.value = "";
+    };
+
+    const drop = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setDragging(false);
+        add(event.dataTransfer.files);
+    };
+
+    const remove = (id: string) => {
+        setItems((current) => {
+            const item = current.find((entry) => entry.id === id);
+            if (item) URL.revokeObjectURL(item.preview);
+            return current.filter((entry) => entry.id !== id);
+        });
+        setResults([]);
+    };
+
+    const clear = () => {
+        items.forEach((item) => URL.revokeObjectURL(item.preview));
+        setItems([]);
+        setResults([]);
+        if (zipUrl) {
+            URL.revokeObjectURL(zipUrl);
+            setZipUrl("");
+        }
+    };
+
+    const resize = async () => {
+        if (!items.length || processing) return;
+        setProcessing(true);
+        setError("");
+        setResults([]);
+        try {
+            const body = new FormData();
+            items.forEach((item) => body.append("files", item.file));
+            body.append("mode", mode);
+            body.append("format", format);
+            body.append("keepRatio", String(keepRatio));
+            body.append("width", width);
+            body.append("height", height);
+            body.append("percentage", percentage);
+            const response = await fetch("/api/resize-image", { method: "POST", body });
+            const payload = await response.json() as { error?: string; results?: Result[]; zip?: string };
+            if (!response.ok || !payload.results || !payload.zip) throw new Error(payload.error || "Image resizing failed.");
+            setResults(payload.results);
+            const binary = atob(payload.zip);
+            const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+            setZipUrl(URL.createObjectURL(new Blob([bytes], { type: "application/zip" })));
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : "Image resizing failed.");
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     const outputTotal = results.reduce((sum, result) => sum + result.resizedSize, 0);
 
-    return <main className="min-h-screen bg-slate-50 text-slate-950"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8"><Link href="/" className="text-2xl font-bold tracking-tight">File<span className="text-blue-600">vera</span></Link><Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">← All Tools</Link></div></header><section className="px-5 py-12 sm:px-8 sm:py-16"><div className="mx-auto max-w-4xl"><div className="text-center"><p className="text-sm font-semibold uppercase tracking-widest text-blue-700">Image Tools</p><h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Image Resizer</h1><p className="mx-auto mt-5 max-w-2xl leading-7 text-slate-600">Resize JPG, PNG, and WebP images to the dimensions you need while keeping quality and transparency where possible.</p></div>
-        <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"><div onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop} className={`rounded-2xl border-2 border-dashed p-8 text-center sm:p-12 ${dragging ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-slate-50/70"}`}><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-sm font-bold text-blue-700" aria-hidden="true">IMG</div><h2 className="mt-5 text-xl font-semibold">Drop images here</h2><p className="mt-2 text-sm text-slate-500">JPG, PNG, or WebP · up to {MAX_COUNT} images</p><label className="mt-6 inline-flex cursor-pointer rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500">Choose Images<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={choose} /></label></div>
-            {items.length > 0 && <><div className="mt-7 flex items-center justify-between"><h2 className="font-semibold">Selected images ({items.length})</h2><button type="button" onClick={clear} disabled={processing} className="rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">Clear all</button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{items.map((item, index) => <div key={item.id} className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"><img src={item.preview} alt={`Preview of ${item.file.name}`} className="h-16 w-16 rounded-lg object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{index + 1}. {item.file.name}</p><p className="text-xs text-slate-500">{size(item.file.size)}</p></div><button type="button" onClick={() => remove(item.id)} disabled={processing} aria-label={`Remove ${item.file.name}`} className="rounded-lg px-2 py-2 text-lg text-slate-500 hover:bg-red-50 hover:text-red-700">×</button></div>)}</div>
-                {!results.length && <div className="mt-8 grid gap-5 border-t border-slate-200 pt-7 sm:grid-cols-2"><div><label htmlFor="resize-mode" className="text-sm font-semibold">Resize mode</label><select id="resize-mode" value={mode} onChange={(event) => setMode(event.target.value as Mode)} disabled={processing} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="fit">Fit within dimensions</option><option value="exact">Exact dimensions</option><option value="percentage">Percentage</option></select></div><div><label htmlFor="output-format" className="text-sm font-semibold">Output format</label><select id="output-format" value={format} onChange={(event) => setFormat(event.target.value as Format)} disabled={processing} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="original">Keep original format</option><option value="jpeg">JPG</option><option value="png">PNG</option><option value="webp">WebP</option></select></div>{mode === "percentage" ? <div><label htmlFor="percentage" className="text-sm font-semibold">Percentage (1-100)</label><input id="percentage" type="number" min="1" max="100" value={percentage} onChange={(event) => setPercentage(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div> : <><div><label htmlFor="width" className="text-sm font-semibold">Width (px)</label><input id="width" type="number" min="1" max="8000" value={width} onChange={(event) => setWidth(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label htmlFor="height" className="text-sm font-semibold">Height (px)</label><input id="height" type="number" min="1" max="8000" value={height} onChange={(event) => setHeight(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div><label className="flex items-center gap-3 text-sm font-medium sm:col-span-2"><input type="checkbox" checked={keepRatio} onChange={(event) => setKeepRatio(event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-blue-700 focus:ring-blue-500" />Maintain aspect ratio</label>{mode === "exact" && <p className="text-sm text-amber-700 sm:col-span-2">Exact mode can distort images when the requested ratio differs from the original.</p>}</>}</div>}
-                {!results.length && <button type="button" onClick={resize} disabled={processing} className="mt-7 flex w-full items-center justify-center gap-3 rounded-xl bg-blue-700 px-6 py-4 font-semibold text-white hover:bg-blue-800 disabled:cursor-wait disabled:bg-slate-400">{processing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}{processing ? "Resizing images..." : "Resize Images"}</button>}</>}
-            {error && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</p>}</div>
-        {results.length > 0 && <section className="mt-8" aria-labelledby="result-heading"><div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><h2 id="result-heading" className="font-semibold text-emerald-950">Images resized successfully</h2><p className="mt-2 text-sm text-emerald-900">{results.length} image{results.length === 1 ? "" : "s"} · output total {size(outputTotal)}</p>{zipUrl && <a href={zipUrl} download="resized-images.zip" className="mt-5 inline-flex rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white hover:bg-emerald-800">Download all as ZIP</a>}</div><div className="mt-5 grid gap-4 sm:grid-cols-2">{results.map((result) => { const url = imageUrl(result.data, result.name); return <article key={result.name} className="rounded-2xl border border-slate-200 bg-white p-4"><img src={url} alt={`Resized preview of ${result.originalName}`} className="h-48 w-full rounded-xl bg-slate-100 object-contain" /><h3 className="mt-4 truncate font-semibold">{result.originalName}</h3><p className="mt-1 text-sm text-slate-500">Original: {result.originalWidth} × {result.originalHeight} · {size(result.originalSize)}</p><p className="mt-1 text-sm text-emerald-700">New: {result.width} × {result.height} · {size(result.resizedSize)}</p><a href={url} download={result.name} className="mt-4 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Download</a></article>; })}</div><button type="button" onClick={() => { setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } }} className="mt-5 rounded-lg px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">Resize again</button></section>}
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6"><h2 className="font-semibold">Your files are private</h2><p className="mt-1 text-sm leading-6 text-slate-600">Images are processed server-side and are not permanently stored.</p></div><section className="mt-14"><h2 className="text-2xl font-bold">How to resize an image</h2><div className="mt-6 grid gap-4 sm:grid-cols-3">{[["01", "Upload", "Choose one or more supported images."], ["02", "Set dimensions", "Fit preserves proportions; exact mode fills both dimensions."], ["03", "Download", "Preview the actual resized output and download it or a ZIP."]].map(([n, h, c]) => <div key={n} className="rounded-2xl bg-white p-5"><div className="font-bold text-blue-700">{n}</div><h3 className="mt-3 font-semibold">{h}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{c}</p></div>)}</div></section>
-    </div></section></main>;
+    return (
+        <ToolShell
+            category="Images"
+            title="Image Resizer"
+            badge="Image Tools"
+            description="Resize JPG, PNG, and WebP images to exact pixel dimensions or scaling percentages with aspect ratio lock."
+            howItWorksSteps={[
+                "Select one or more images from your device.",
+                "Choose dimensions, scale percentage, and aspect ratio option.",
+                "Download your resized image files or complete ZIP archive."
+            ]}
+            faqs={[
+                {
+                    question: "What is the difference between Fit and Exact mode?",
+                    answer: "Fit scales the image to fit within the box without distorting proportions, while Exact forces both width and height."
+                },
+                {
+                    question: "Can I convert format while resizing?",
+                    answer: "Yes, you can convert to JPG, PNG, or WebP during the resize step."
+                },
+                {
+                    question: "Are transparent PNGs supported?",
+                    answer: "Yes, PNG and WebP transparency is fully preserved when resizing."
+                }
+            ]}
+            relatedTools={[
+                { name: "Image Compressor", href: "/image-compressor" },
+                { name: "50KB Compressor", href: "/compress-image-to-50kb" },
+                { name: "JPG to PDF", href: "/jpg-to-pdf" }
+            ]}
+        >
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
+                <div
+                    onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={drop}
+                    className={`rounded-xl border-2 border-dashed py-5 px-4 text-center transition sm:py-6 sm:px-5 ${dragging ? "border-sky-500 bg-sky-50" : "border-slate-300 bg-slate-50/60"}`}
+                >
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-xs font-bold text-sky-700" aria-hidden="true">IMG</div>
+                    <h2 className="mt-2 text-sm sm:text-base font-semibold text-slate-900">Drop images here</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">JPG, PNG, or WebP · up to {MAX_COUNT} images</p>
+                    <label className="mt-2.5 inline-flex h-9 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-semibold text-white hover:bg-sky-600 transition-colors focus-within:outline-none focus-within:ring-2 focus-within:ring-sky-400 shadow-2xs">
+                        Choose Images
+                        <input type="file" multiple accept={ACCEPT} className="sr-only" onChange={choose} />
+                    </label>
+                    <p className="mt-1.5 text-[11px] text-slate-400">Batch image resizing supported</p>
+                </div>
+
+                {items.length > 0 && (
+                    <div className="mt-3.5 space-y-3">
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                            <span>Selected images ({items.length})</span>
+                            <button type="button" onClick={clear} disabled={processing} className="text-red-600 hover:underline disabled:opacity-50">
+                                Clear all
+                            </button>
+                        </div>
+
+                        <div className="grid gap-1.5 sm:grid-cols-2 max-h-40 overflow-y-auto pr-1">
+                            {items.map((item, index) => (
+                                <div key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 text-xs">
+                                    <img src={item.preview} alt={`Preview of ${item.file.name}`} className="h-8 w-8 rounded object-cover flex-shrink-0" />
+                                    <div className="min-w-0 flex-1 truncate">
+                                        <p className="truncate font-medium text-slate-900">{index + 1}. {item.file.name}</p>
+                                        <p className="text-[11px] text-slate-500">{size(item.file.size)}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => remove(item.id)}
+                                        disabled={processing}
+                                        aria-label={`Remove ${item.file.name}`}
+                                        className="rounded px-1 text-xs text-red-600 hover:bg-red-50"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        {!results.length && (
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
+                                <div className="grid gap-2.5 sm:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="resize-mode" className="block text-[11px] font-semibold uppercase tracking-wider text-slate-700">Resize mode</label>
+                                        <select
+                                            id="resize-mode"
+                                            value={mode}
+                                            onChange={(event) => setMode(event.target.value as Mode)}
+                                            disabled={processing}
+                                            className="mt-1 h-9 w-full rounded-xl border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                        >
+                                            <option value="fit">Fit within dimensions</option>
+                                            <option value="exact">Exact dimensions</option>
+                                            <option value="percentage">Percentage scaling</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="output-format" className="block text-[11px] font-semibold uppercase tracking-wider text-slate-700">Output format</label>
+                                        <select
+                                            id="output-format"
+                                            value={format}
+                                            onChange={(event) => setFormat(event.target.value as Format)}
+                                            disabled={processing}
+                                            className="mt-1 h-9 w-full rounded-xl border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                        >
+                                            <option value="original">Keep original format</option>
+                                            <option value="jpeg">JPG</option>
+                                            <option value="png">PNG</option>
+                                            <option value="webp">WebP</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {mode === "percentage" ? (
+                                    <div>
+                                        <label htmlFor="percentage" className="block text-[11px] font-semibold uppercase tracking-wider text-slate-700">Percentage (1-100%)</label>
+                                        <input
+                                            id="percentage"
+                                            type="number"
+                                            min="1"
+                                            max="100"
+                                            value={percentage}
+                                            onChange={(event) => setPercentage(event.target.value)}
+                                            className="mt-1 h-9 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="grid gap-2.5 sm:grid-cols-2">
+                                            <div>
+                                                <label htmlFor="width" className="block text-[11px] font-semibold uppercase tracking-wider text-slate-700">Width (px)</label>
+                                                <input
+                                                    id="width"
+                                                    type="number"
+                                                    min="1"
+                                                    max="8000"
+                                                    value={width}
+                                                    onChange={(event) => setWidth(event.target.value)}
+                                                    className="mt-1 h-9 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="height" className="block text-[11px] font-semibold uppercase tracking-wider text-slate-700">Height (px)</label>
+                                                <input
+                                                    id="height"
+                                                    type="number"
+                                                    min="1"
+                                                    max="8000"
+                                                    value={height}
+                                                    onChange={(event) => setHeight(event.target.value)}
+                                                    className="mt-1 h-9 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                                                />
+                                            </div>
+                                        </div>
+                                        <label className="flex items-center gap-1.5 pt-0.5 text-xs text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={keepRatio}
+                                                onChange={(event) => setKeepRatio(event.target.checked)}
+                                                className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                            />
+                                            <span>Maintain aspect ratio</span>
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {!results.length && (
+                            <div className="flex flex-col items-center pt-1">
+                                <button
+                                    type="button"
+                                    onClick={resize}
+                                    disabled={processing}
+                                    className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-wait disabled:bg-slate-300 shadow-2xs"
+                                >
+                                    {processing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
+                                    {processing ? "Resizing images..." : `Resize ${items.length} image${items.length === 1 ? "" : "s"}`}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">{error}</p>}
+
+                {results.length > 0 && (
+                    <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4">
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
+                            <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">Images resized successfully</h2>
+                        </div>
+                        <p className="mt-0.5 text-xs text-emerald-900">{results.length} image{results.length === 1 ? "" : "s"} · Total output {size(outputTotal)}</p>
+
+                        <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 max-h-48 overflow-y-auto pr-1">
+                            {results.map((result) => {
+                                const url = imageUrl(result.data, result.name);
+                                return (
+                                    <article key={result.name} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs">
+                                        <img src={url} alt={`Resized preview of ${result.originalName}`} className="h-10 w-10 rounded bg-slate-100 object-contain flex-shrink-0" />
+                                        <div className="min-w-0 flex-1 truncate">
+                                            <h3 className="truncate font-semibold text-slate-900">{result.originalName}</h3>
+                                            <p className="text-[11px] text-slate-500">{result.originalWidth}×{result.originalHeight} → <span className="text-emerald-700 font-medium">{result.width}×{result.height}</span></p>
+                                        </div>
+                                        <a href={url} download={result.name} className="rounded px-2 py-1 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-700 transition-colors">
+                                            Download
+                                        </a>
+                                    </article>
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-3 flex flex-col sm:flex-row items-center gap-2.5">
+                            {zipUrl && (
+                                <a href={zipUrl} download="resized-images.zip" className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs">
+                                    Download all as ZIP
+                                </a>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => { setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } }}
+                                className="text-xs font-medium text-emerald-800 underline underline-offset-4 hover:text-emerald-950"
+                            >
+                                Resize more images
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </ToolShell>
+    );
 }

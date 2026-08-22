@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, DragEvent, useMemo, useState } from "react";
 import TargetSizeInput from "@/app/components/target-size-input";
-import SiteHeader from "@/app/components/site-header";
-import Breadcrumbs from "@/app/components/breadcrumbs";
+import ToolShell from "@/app/components/tool-shell";
 import { bytesFromTargetSize, formatFileSize, TargetUnit } from "@/lib/target-size";
 import { trackToolEvent } from "@/lib/analytics";
 
@@ -27,7 +25,15 @@ function reduction(original: number, compressed: number) {
   return Math.max(0, ((original - compressed) / original) * 100).toFixed(1);
 }
 
-export default function ImageCompressorTool({ initialValue = "1", initialUnit = "MB", pageTitle = "Image Compressor" }: { initialValue?: string; initialUnit?: TargetUnit; pageTitle?: string }) {
+export default function ImageCompressorTool({
+  initialValue = "1",
+  initialUnit = "MB",
+  pageTitle = "Image Compressor"
+}: {
+  initialValue?: string;
+  initialUnit?: TargetUnit;
+  pageTitle?: string;
+}) {
   const [items, setItems] = useState<File[]>([]);
   const [targetValue, setTargetValue] = useState(initialValue);
   const [targetUnit, setTargetUnit] = useState<TargetUnit>(initialUnit);
@@ -124,130 +130,161 @@ export default function ImageCompressorTool({ initialValue = "1", initialUnit = 
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <SiteHeader />
-      <Breadcrumbs category="Images" current={pageTitle} />
+    <ToolShell
+      category="Images"
+      title={pageTitle}
+      badge="Image Tools"
+      description="Compress JPG, PNG, and WebP images to your desired target file size without losing sharpness."
+      howItWorksSteps={[
+        "Upload one or more JPG, PNG, or WebP images.",
+        "Set your target size limit (e.g. 50KB, 100KB, 500KB).",
+        "Download your compressed images or a consolidated ZIP archive."
+      ]}
+      faqs={[
+        {
+          question: "Can I compress multiple images simultaneously?",
+          answer: "Yes, you can batch compress up to 20 images in a single step."
+        },
+        {
+          question: "Which image formats are supported?",
+          answer: "Filevera supports JPG, JPEG, PNG, and modern WebP formats."
+        },
+        {
+          question: "How does Filevera maintain image clarity?",
+          answer: "Our pipeline uses Sharp's native mozjpeg, libpng, and libwebp compression algorithms to strip non-visual metadata and optimize color quantization."
+        }
+      ]}
+      relatedTools={[
+        { name: "50KB Target", href: "/compress-image-to-50kb" },
+        { name: "100KB Target", href: "/compress-image-to-100kb" },
+        { name: "Image Resizer", href: "/image-resizer" },
+        { name: "JPG to PDF", href: "/jpg-to-pdf" }
+      ]}
+    >
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
+        <div
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-xl border-2 border-dashed py-5 px-4 text-center transition sm:py-6 sm:px-5 ${dragging ? "border-sky-500 bg-sky-50" : "border-slate-300 bg-slate-50/60"}`}
+        >
+          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-xs font-bold text-sky-700" aria-hidden="true">IMG</div>
+          <h2 className="mt-2 text-sm sm:text-base font-semibold text-slate-900">Drop images here</h2>
+          <p className="mt-0.5 text-xs text-slate-500">JPG, PNG, or WebP · up to {MAX_IMAGES} images</p>
+          <label className="mt-2.5 inline-flex h-9 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-semibold text-white hover:bg-sky-600 transition-colors focus-within:outline-none focus-within:ring-2 focus-within:ring-sky-400 shadow-2xs">
+            Choose Images
+            <input type="file" multiple accept={ACCEPT} className="sr-only" onChange={handleChoose} />
+          </label>
+          <p className="mt-1.5 text-[11px] text-slate-400">Multiple image compression supported</p>
+        </div>
 
-      <section className="px-5 py-12 sm:px-8 sm:py-16">
-        <div className="mx-auto max-w-4xl">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">Image Tools</p>
-            <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{pageTitle}</h1>
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600">
-              Reduce the file size of JPG, PNG, and WebP images while keeping quality as high as possible.
-            </p>
-          </div>
+        <div className="mt-3.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5">
+          <TargetSizeInput id="image-target-size" label="Reduce image to" value={targetValue} unit={targetUnit} onValueChange={setTargetValue} onUnitChange={setTargetUnit} disabled={processing} error={targetError} />
+        </div>
 
-          <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-            <div
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={handleDrop}
-              className={`rounded-2xl border-2 border-dashed p-8 text-center transition sm:p-12 ${dragging ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-slate-50/70"}`}
-            >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-sm font-bold text-blue-700" aria-hidden="true">IMG</div>
-              <h2 className="mt-5 text-xl font-semibold">Drop images here</h2>
-              <p className="mt-2 text-sm text-slate-500">JPG, PNG, or WebP · up to {MAX_IMAGES} images</p>
-              <label className="mt-6 inline-flex cursor-pointer rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500">
-                Choose Images
-                <input type="file" multiple accept={ACCEPT} className="sr-only" onChange={handleChoose} />
-              </label>
+        {items.length > 0 && (
+          <div className="mt-3.5 space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+              <span>Selected images ({items.length})</span>
+              <button type="button" onClick={() => setItems([])} className="text-red-600 hover:underline">
+                Clear all
+              </button>
             </div>
 
-            <div className="mt-7 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <TargetSizeInput id="image-target-size" label="Reduce image to" value={targetValue} unit={targetUnit} onValueChange={setTargetValue} onUnitChange={setTargetUnit} disabled={processing} error={targetError} />
-            </div>
-
-            {items.length > 0 && (
-              <div className="mt-7 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-semibold">Selected images ({items.length})</h2>
-                  <button type="button" onClick={() => setItems([])} className="rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                    Clear
+            <div className="grid gap-1.5 sm:grid-cols-2 max-h-48 overflow-y-auto pr-1">
+              {items.map((file) => (
+                <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/70 p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate">
+                    <p className="truncate font-medium text-slate-900">{file.name}</p>
+                    <p className="text-[11px] text-slate-500">{formatFileSize(file.size)}</p>
+                  </div>
+                  <button type="button" onClick={() => removeItem(file.name)} className="ml-2 rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 transition-colors">
+                    ✕
                   </button>
                 </div>
+              ))}
+            </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  {items.map((file) => (
-                    <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{file.name}</p>
-                        <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
-                      </div>
-                      <button type="button" onClick={() => removeItem(file.name)} className="rounded-lg px-2 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+            <div className="flex flex-col items-center pt-1.5">
+              <button
+                type="button"
+                onClick={compress}
+                disabled={processing || !items.length || !targetBytes}
+                className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-wait disabled:bg-slate-300 shadow-2xs"
+              >
+                {processing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
+                {processing ? "Compressing images..." : `Compress ${items.length} image${items.length === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">
+            {error}
+          </p>
+        )}
+
+        {results.length > 0 && (
+          <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
+              <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">
+                {results.every((result) => result.reachedTarget) ? "Target reached" : "Best achievable compression ready"}
+              </h2>
+            </div>
+            <p className="mt-0.5 text-xs text-emerald-900">Target limit: {targetValue} {targetUnit}</p>
+
+            <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 rounded-lg bg-white/90 p-2.5 border border-emerald-100">
+              <div>
+                <p className="text-slate-500">Original</p>
+                <p className="font-semibold text-slate-900">{formatFileSize(totalOriginal)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Compressed</p>
+                <p className="font-semibold text-emerald-700">{formatFileSize(totalCompressed)}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Savings</p>
+                <p className="font-semibold text-emerald-700">{reduction(totalOriginal, totalCompressed)}%</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Files</p>
+                <p className="font-semibold text-slate-900">{results.length}</p>
+              </div>
+            </div>
+
+            <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 max-h-40 overflow-y-auto pr-1">
+              {results.map((result) => (
+                <div key={result.name} className="rounded-lg border border-emerald-200 bg-white p-2 text-xs">
+                  <p className="truncate font-semibold text-slate-900">{result.name}</p>
+                  <p className="mt-0.5 text-slate-500">
+                    {formatFileSize(result.originalSize)} → <span className="font-medium text-emerald-700">{formatFileSize(result.compressedSize)}</span>
+                  </p>
                 </div>
+              ))}
+            </div>
 
+            {zipUrl && (
+              <div className="mt-3 flex flex-col sm:flex-row items-center gap-2.5">
+                <a href={zipUrl} download="compressed-images.zip" onClick={() => trackToolEvent("download", "compress-image")} className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs">
+                  Download ZIP
+                </a>
                 <button
                   type="button"
-                  onClick={compress}
-                  disabled={processing || !items.length || !targetBytes}
-                  className="w-full rounded-xl bg-blue-700 px-6 py-4 font-semibold text-white hover:bg-blue-800 disabled:cursor-wait disabled:bg-slate-400"
+                  onClick={() => { setItems([]); setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } }}
+                  className="text-xs font-medium text-emerald-800 underline underline-offset-4 hover:text-emerald-950"
                 >
-                  {processing ? "Compressing..." : "Compress Image"}
+                  Compress more images
                 </button>
               </div>
             )}
-
-            {error && (
-              <p className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800" role="alert">
-                {error}
-              </p>
-            )}
-
-            {results.length > 0 && (
-              <div className="mt-7 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                <h2 className="text-lg font-semibold text-emerald-950">{results.every((result) => result.reachedTarget) ? "Target reached" : "Best achievable results"}</h2>
-                <p className="mt-2 text-sm text-emerald-900">Requested target: {targetValue} {targetUnit}</p>
-                {!results.every((result) => result.reachedTarget) && <p className="mt-2 text-sm text-emerald-900">The requested target could not be reached without excessive quality loss. The best valid results are ready to download.</p>}
-                <div className="mt-4 grid gap-4 sm:grid-cols-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Original</p>
-                    <p className="mt-1 font-semibold">{formatFileSize(totalOriginal)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Compressed</p>
-                    <p className="mt-1 font-semibold">{formatFileSize(totalCompressed)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Savings</p>
-                    <p className="mt-1 font-semibold">{reduction(totalOriginal, totalCompressed)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Files</p>
-                    <p className="mt-1 font-semibold">{results.length}</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {results.map((result) => (
-                    <div key={result.name} className="rounded-xl border border-emerald-200 bg-white p-3">
-                      <p className="truncate text-sm font-semibold">{result.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {formatFileSize(result.originalSize)} → {formatFileSize(result.compressedSize)}
-                      </p>
-                      <p className="mt-1 text-xs text-emerald-700">{result.reachedTarget ? "Target reached" : "Requested target could not be reached without excessive quality loss."} · {reduction(result.originalSize, result.compressedSize)}% reduction</p>
-                    </div>
-                  ))}
-                </div>
-
-                {zipUrl && (
-                  <a href={zipUrl} download="compressed-images.zip" onClick={() => trackToolEvent("download", "compress-image")} className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-6 py-3 font-semibold text-white hover:bg-emerald-800 sm:w-auto">
-                    Download ZIP
-                  </a>
-                )}
-              </div>
-            )}
-            <nav className="mt-8 flex flex-wrap gap-3 text-sm font-semibold text-blue-700" aria-label="Related image tools"><Link href="/compress-image-to-50kb" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Compress Image to 50KB</Link><Link href="/image-resizer" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Resize Image</Link><Link href="/jpg-to-pdf" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">JPG to PDF</Link></nav>
           </div>
-        </div>
-      </section>
-    </main>
+        )}
+      </div>
+    </ToolShell>
   );
 }

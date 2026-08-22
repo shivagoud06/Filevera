@@ -62,6 +62,12 @@ export const auth = betterAuth({
     secret: process.env.BETTER_AUTH_SECRET ?? randomBytes(32).toString("hex"),
     baseURL: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
     trustedOrigins: [process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"],
+    account: {
+        accountLinking: {
+            enabled: true,
+            trustedProviders: ["google"],
+        },
+    },
     emailAndPassword: {
         enabled: true,
         minPasswordLength: 8,
@@ -70,6 +76,7 @@ export const auth = betterAuth({
         google: {
             clientId: googleClientId,
             clientSecret: googleClientSecret,
+            prompt: "select_account",
         },
     } : undefined,
 });

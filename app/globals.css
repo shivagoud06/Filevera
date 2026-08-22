@@ -1,25 +1,3 @@
-main.bg-slate-50 {
-  min-height: auto !important;
-}
-
-main.bg-slate-50>article,
-main.bg-slate-50>section {
-  padding-top: 2rem;
-  padding-bottom: 2.5rem;
-}
-
-input,
-select,
-textarea {
-  color: var(--filevera-ink);
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: var(--filevera-muted);
-  opacity: 0.85;
-}
-
 @import "tailwindcss";
 
 :root {
@@ -46,11 +24,45 @@ textarea::placeholder {
   }
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+@media (min-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 14px;
+  }
+}
+
+input,
+select,
+textarea {
+  color: var(--filevera-ink);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--filevera-muted);
+  opacity: 0.8;
 }
 
 /* Keep legacy utility classes aligned with the Filevera palette. */
@@ -92,7 +104,7 @@ a.bg-blue-700 {
   color: #ffffff !important;
 }
 
-body:has(.auth-page)>footer {
+body:has(.auth-page) > footer {
   display: none;
 }
 

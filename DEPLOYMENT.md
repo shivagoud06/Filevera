@@ -1,34 +1,61 @@
-# Deployment Guide
+# Filevera Deployment & Configuration Guide
 
 ## Requirements
 - Node.js 20+
 - npm
 - Ghostscript installed on the host or container when PDF compression is enabled
-- A public HTTPS domain or a reverse proxy in front of the app
+- A public HTTPS domain or reverse proxy for production deployment
 
-## Install
+## Quick Start
 ```bash
 npm install
 cp .env.example .env.local
 ```
 
-## Build
+## Production Build & Run
 ```bash
 npm run build
-```
-
-## Start
-```bash
 npm run start
 ```
 
-## Production notes
-- Set `NEXT_PUBLIC_SITE_URL` to the public domain.
-- Install Ghostscript and set `GHOSTSCRIPT_PATH` if it is not on PATH.
-- Set `BETTER_AUTH_SECRET` to a long random value in production and keep `AUTH_DATABASE_PATH` on persistent storage.
-- Set `NEXT_PUBLIC_SUPPORT_EMAIL` before publishing the contact and legal pages.
-- Password reset email delivery and Google OAuth are not enabled until an email provider and OAuth credentials are configured in the Better Auth setup.
-- To enable Google sign-in, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. In Google Cloud Console, add this development redirect URI: `{NEXT_PUBLIC_SITE_URL}/api/auth/callback/google` (normally `http://localhost:3000/api/auth/callback/google`). For production, use the same path on the configured HTTPS `NEXT_PUBLIC_SITE_URL`, for example `https://your-filevera-domain.example/api/auth/callback/google`.
-- Google sign-in uses Better Auth's existing account linking and session handling. Do not expose either Google credential in client-side variables.
-- Keep PDF/image processing behind the application server and clean temporary files in `finally` blocks.
-- Use a production reverse proxy or platform to enforce HTTPS, caching, and security headers.
+---
+
+## Google Cloud OAuth 2.0 Configuration
+
+Filevera uses **Better Auth** with native OpenID Connect / OAuth 2.0 for Google Authentication.
+
+### Step-by-Step Google Cloud Setup
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project (e.g. `Filevera-Production`).
+3. Under **APIs & Services** → **OAuth consent screen**:
+   - Choose **External** User Type.
+   - Fill in **App Name** (`Filevera`), **User support email**, and **Developer contact email**.
+   - Add scopes: `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`.
+   - Publish the app or add test users during development.
+4. Under **APIs & Services** → **Credentials**:
+   - Click **Create Credentials** → **OAuth client ID**.
+   - Application type: **Web application**.
+   - Name: `Filevera Web Client`.
+   - **Authorized JavaScript origins**:
+     - Development: `http://localhost:3000`
+     - Production: `https://your-domain.com` (your configured `NEXT_PUBLIC_SITE_URL`)
+   - **Authorized redirect URIs**:
+     - Development: `http://localhost:3000/api/auth/callback/google`
+     - Production: `https://your-domain.com/api/auth/callback/google`
+5. Copy the generated **Client ID** and **Client Secret** into your `.env.local` or hosting environment variables:
+   ```env
+   GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   ```
+
+---
+
+## Authentication Architecture & Security
+
+- **Library**: `better-auth` v1.7.1
+- **Database**: SQLite with persistent storage via `better-sqlite3` at `AUTH_DATABASE_PATH`.
+- **Session Handling**: Cryptographically signed HttpOnly session cookies with automatic token rotation.
+- **Account Linking**: Enabled for trusted `google` provider. If a user registers with email/password and later clicks *Continue with Google* using the same verified email, the accounts are linked without duplicating user records.
+- **Anonymous Access**: All file processing tools remain 100% free and accessible without login. Authentication is strictly optional for users.
+- **Error Handling**: Graceful fallback when Google credentials are not configured, displaying user-friendly notices without exposing stack traces or internal endpoints.

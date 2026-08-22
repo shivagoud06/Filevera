@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, DragEvent, useEffect, useState } from "react";
 import TargetSizeInput from "@/app/components/target-size-input";
-import SiteHeader from "@/app/components/site-header";
-import Breadcrumbs from "@/app/components/breadcrumbs";
+import ToolShell from "@/app/components/tool-shell";
 import { bytesFromTargetSize, formatFileSize, TargetUnit } from "@/lib/target-size";
 import { trackToolEvent } from "@/lib/analytics";
 
@@ -126,95 +124,152 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
     };
 
     return (
-        <main className="min-h-screen bg-slate-50 text-slate-950">
-            <SiteHeader />
-            <Breadcrumbs category="PDF" current="Compress PDF" />
-
-            <section className="px-5 py-12 sm:px-8 sm:py-16">
-                <div className="mx-auto max-w-3xl">
-                    <div className="text-center">
-                        <p className="text-sm font-semibold uppercase tracking-widest text-blue-700">PDF tools</p>
-                        <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Compress PDF to Target Size</h1>
-                        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600">Choose a maximum file size and we will try several real compression settings to get your PDF there without sacrificing more quality than necessary.</p>
-                    </div>
-
-                    <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-                        <div
-                            onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={handleDrop}
-                            className={`rounded-2xl border-2 border-dashed p-8 text-center transition sm:p-12 ${isDragging ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-slate-50/70"}`}
-                        >
-                            {!file ? (
-                                <>
-                                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-sm font-bold text-blue-700" aria-hidden="true">PDF</div>
-                                    <h2 className="mt-5 text-xl font-semibold">Drop your PDF here</h2>
-                                    <p className="mt-2 text-sm text-slate-500">or choose a file from your device</p>
-                                    <label className="mt-6 inline-flex cursor-pointer rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2">
-                                        Choose PDF
-                                        <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={handleChoose} />
-                                    </label>
-                                    <p className="mt-4 text-xs text-slate-500">PDF only · Maximum 25 MB</p>
-                                </>
-                            ) : (
-                                <div className="text-left">
-                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="min-w-0">
-                                            <p className="truncate font-semibold text-slate-900">{file.name}</p>
-                                            <p className="mt-1 text-sm text-slate-500">Original size: {formatFileSize(file.size)}</p>
-                                        </div>
-                                        <button type="button" onClick={removeFile} disabled={isProcessing} className="self-start rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 sm:self-auto">Remove / replace</button>
-                                    </div>
+        <ToolShell
+            category="PDF"
+            title="Compress PDF to Target Size"
+            badge="PDF Tools"
+            description="Select a target file size (e.g. 500KB, 1MB, 2MB) and our multi-pass compression engine will optimize your PDF with the highest possible visual clarity."
+            howItWorksSteps={[
+                "Upload any PDF document up to 25 MB.",
+                "Specify your target size limit in KB or MB.",
+                "Download the compressed PDF instantly."
+            ]}
+            faqs={[
+                {
+                    question: "How does target size compression work?",
+                    answer: "Our backend tests multiple Ghostscript compression parameters (DPI downsampling, image stream compression, and font subsetting) to reach your target file size without excessive degradation."
+                },
+                {
+                    question: "What if the PDF cannot reach the exact target?",
+                    answer: "If the requested target is lower than what is achievable without extreme distortion, Filevera automatically delivers the maximum compression possible and notifies you with clear metrics."
+                },
+                {
+                    question: "Are my compressed PDFs stored on your server?",
+                    answer: "No. Files are processed in isolated memory directories and permanently wiped immediately after download generation."
+                }
+            ]}
+            relatedTools={[
+                { name: "Compress to 1MB", href: "/compress-pdf-to-1mb" },
+                { name: "Compress to 500KB", href: "/compress-pdf-to-500kb" },
+                { name: "Merge PDF", href: "/merge-pdf" },
+                { name: "Split PDF", href: "/split-pdf" },
+                { name: "JPG to PDF", href: "/jpg-to-pdf" }
+            ]}
+        >
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5">
+                <div
+                    onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                    className={`rounded-xl border-2 border-dashed py-5 px-4 text-center transition sm:py-6 sm:px-5 ${isDragging ? "border-sky-500 bg-sky-50" : "border-slate-300 bg-slate-50/60"}`}
+                >
+                    {!file ? (
+                        <>
+                            <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-xs font-bold text-sky-700" aria-hidden="true">PDF</div>
+                            <h2 className="mt-2 text-sm sm:text-base font-semibold text-slate-900">Drop your PDF here</h2>
+                            <p className="mt-0.5 text-xs text-slate-500">or choose a file from your device</p>
+                            <label className="mt-2.5 inline-flex h-9 cursor-pointer items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-semibold text-white hover:bg-sky-600 transition-colors focus-within:outline-none focus-within:ring-2 focus-within:ring-sky-400 shadow-2xs">
+                                Choose PDF
+                                <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={handleChoose} />
+                            </label>
+                            <p className="mt-1.5 text-[11px] text-slate-400">PDF up to 25 MB</p>
+                        </>
+                    ) : (
+                        <div className="text-left">
+                            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between rounded-xl bg-white p-3 border border-slate-200 shadow-xs">
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs sm:text-sm font-semibold text-slate-900">{file.name}</p>
+                                    <p className="text-[11px] text-slate-500">Original size: {formatFileSize(file.size)}</p>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={removeFile}
+                                    disabled={isProcessing}
+                                    className="self-start rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-50 sm:self-auto"
+                                >
+                                    Remove file
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {!result && (
+                    <div className="mt-4 space-y-3.5">
+                        <fieldset disabled={isProcessing} className="min-w-0">
+                            <TargetSizeInput
+                                id="pdf-target-size"
+                                label="Target size"
+                                value={targetValue}
+                                unit={targetUnit}
+                                onValueChange={setTargetValue}
+                                onUnitChange={setTargetUnit}
+                                disabled={isProcessing}
+                                error={targetError}
+                            />
+                        </fieldset>
+
+                        <div className="flex flex-col items-center pt-1">
+                            <button
+                                type="button"
+                                onClick={compress}
+                                disabled={isProcessing || !file || !targetBytes}
+                                className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 shadow-2xs"
+                            >
+                                {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
+                                {isProcessing ? "Compressing PDF..." : "Compress PDF"}
+                            </button>
+                            {isProcessing && (
+                                <p className="mt-1.5 text-center text-xs text-slate-500" role="status">
+                                    Testing multi-pass compression settings...
+                                </p>
                             )}
                         </div>
-
-                        {!result && (
-                            <div className="mt-7">
-                                <fieldset disabled={isProcessing} className="min-w-0">
-                                    <TargetSizeInput id="pdf-target-size" label="Target size" value={targetValue} unit={targetUnit} onValueChange={setTargetValue} onUnitChange={setTargetUnit} disabled={isProcessing} error={targetError} />
-                                </fieldset>
-                                <button type="button" onClick={compress} disabled={isProcessing || !file || !targetBytes} className="mt-7 flex w-full items-center justify-center gap-3 rounded-xl bg-blue-700 px-6 py-4 font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400">
-                                    {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
-                                    {isProcessing ? "Compressing and checking target..." : "Compress PDF"}
-                                </button>
-                                {isProcessing && <p className="mt-3 text-center text-sm text-slate-500" role="status">The server is testing multiple compression settings. This may take a moment.</p>}
-                            </div>
-                        )}
-
-                        {result && (
-                            <div className="mt-7 rounded-2xl border border-emerald-200 bg-emerald-50 p-5" role="status">
-                                <h2 className="text-lg font-semibold text-emerald-950">{result.reachedTarget ? "Target reached" : "Best achievable result"}</h2>
-                                <p className="mt-2 text-sm leading-6 text-emerald-900">{result.reachedTarget ? "The requested target was reached." : "The requested target could not be reached without excessive quality loss. The best valid result is ready to download."}</p>
-                                <div className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                                    <div><p className="text-emerald-700">Original</p><p className="mt-1 font-semibold">{formatFileSize(result.originalSize)}</p></div>
-                                    <div><p className="text-emerald-700">Target</p><p className="mt-1 font-semibold">{formatFileSize(result.targetBytes)}</p></div>
-                                    <div><p className="text-emerald-700">Final</p><p className="mt-1 font-semibold">{formatFileSize(result.compressedSize)}</p></div>
-                                    <div><p className="text-emerald-700">Saved</p><p className="mt-1 font-semibold">{formatFileSize(Math.max(0, result.originalSize - result.compressedSize))}</p></div>
-                                    <div><p className="text-emerald-700">Reduction</p><p className="mt-1 font-semibold">{reduction(result.originalSize, result.compressedSize)}%</p></div>
-                                </div>
-                                <a href={result.downloadUrl} download={downloadName} onClick={() => trackToolEvent("download", "compress-pdf")} className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-700 px-6 py-3 font-semibold text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 sm:w-auto">Download compressed PDF</a>
-                                <button type="button" onClick={removeFile} className="mt-3 block text-sm font-medium text-emerald-900 underline underline-offset-4 hover:text-emerald-700">Compress another PDF</button>
-                            </div>
-                        )}
-
-                        {error && <p className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800" role="alert">{error}</p>}
                     </div>
+                )}
 
-                    <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
-                        <div className="flex gap-4"><div className="text-sm font-bold text-blue-700" aria-hidden="true">INFO</div><div><h2 className="font-semibold">Temporary processing</h2><p className="mt-1 text-sm leading-6 text-slate-600">Uploads are kept in temporary server files while they are processed, then the processing directory is removed.</p></div></div>
-                    </div>
-
-                    <nav className="mt-8 flex flex-wrap gap-3 text-sm font-semibold text-blue-700" aria-label="Related PDF tools"><Link href="/compress-pdf-to-1mb" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Compress PDF to 1MB</Link><Link href="/compress-pdf-to-500kb" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Compress PDF to 500KB</Link><Link href="/merge-pdf" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Merge PDF</Link><Link href="/split-pdf" className="rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-blue-300">Split PDF</Link></nav>
-                    <section className="mt-14" aria-labelledby="how-to-heading">
-                        <h2 id="how-to-heading" className="text-2xl font-bold">How to compress a PDF to a target size</h2>
-                        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                            {[['01', 'Upload', 'Choose a PDF up to 25 MB.'], ['02', 'Set a limit', 'Enter any positive size in KB or MB.'], ['03', 'Download', 'We test settings and return the best result.']].map(([number, heading, copy]) => <div key={number} className="rounded-2xl bg-white p-5"><div className="font-bold text-blue-700">{number}</div><h3 className="mt-3 font-semibold">{heading}</h3><p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p></div>)}
+                {result && (
+                    <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4" role="status">
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
+                            <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">
+                                {result.reachedTarget ? "Target size achieved" : "Best achievable compression ready"}
+                            </h2>
                         </div>
-                        <p className="mt-7 text-sm leading-7 text-slate-600">Target-size compression is useful for email attachments, online forms and portals with strict upload limits. Image-heavy PDFs may not reach the smallest targets without a visible quality tradeoff.</p>
-                    </section>
-                </div>
-            </section>
-        </main>
+                        <p className="mt-0.5 text-xs text-emerald-900">
+                            {result.reachedTarget
+                                ? "Your PDF has been compressed to the requested target size."
+                                : "Quality limit reached; best valid file size generated."}
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5 rounded-lg bg-white/90 p-2.5 border border-emerald-100">
+                            <div><p className="text-slate-500">Original</p><p className="font-semibold text-slate-900">{formatFileSize(result.originalSize)}</p></div>
+                            <div><p className="text-slate-500">Target</p><p className="font-semibold text-slate-900">{formatFileSize(result.targetBytes)}</p></div>
+                            <div><p className="text-slate-500">Final</p><p className="font-semibold text-emerald-700">{formatFileSize(result.compressedSize)}</p></div>
+                            <div><p className="text-slate-500">Saved</p><p className="font-semibold text-emerald-700">{formatFileSize(Math.max(0, result.originalSize - result.compressedSize))}</p></div>
+                            <div><p className="text-slate-500">Reduction</p><p className="font-semibold text-emerald-700">{reduction(result.originalSize, result.compressedSize)}%</p></div>
+                        </div>
+                        <div className="mt-3 flex flex-col sm:flex-row items-center gap-2.5">
+                            <a
+                                href={result.downloadUrl}
+                                download={downloadName}
+                                onClick={() => trackToolEvent("download", "compress-pdf")}
+                                className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                            >
+                                Download compressed PDF
+                            </a>
+                            <button
+                                type="button"
+                                onClick={removeFile}
+                                className="text-xs font-medium text-emerald-800 underline underline-offset-4 hover:text-emerald-950"
+                            >
+                                Compress another PDF
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">{error}</p>}
+            </div>
+        </ToolShell>
     );
 }

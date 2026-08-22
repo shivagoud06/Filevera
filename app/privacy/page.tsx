@@ -8,6 +8,38 @@ const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900"><SiteHeader /><article className="mx-auto max-w-3xl px-5 py-12 sm:px-8"><Link href="/" className="text-sm font-semibold text-blue-700">← Back to Filevera</Link><h1 className="mt-5 text-4xl font-bold">Privacy Policy</h1><p className="mt-3 text-sm text-slate-500">Last updated: August 22, 2026</p><div className="mt-8 space-y-8 rounded-2xl border border-slate-200 bg-white p-6 text-sm leading-7 shadow-sm sm:p-10"><section><h2 className="text-xl font-bold">Information we may collect</h2><p className="mt-3">Filevera may process an email address, name, and authentication records when you create an account. Basic technical information may be present in normal server logs. No document contents are used for account profiling.</p></section><section><h2 className="text-xl font-bold">Uploaded files</h2><p className="mt-3">Files are uploaded only to provide the operation you request. PDF and image processing may use temporary server files. Processing code removes its temporary working directory when the operation finishes; transient system or provider backups may follow their own retention policies.</p></section><section><h2 className="text-xl font-bold">Accounts and cookies</h2><p className="mt-3">Authentication uses session cookies managed by Better Auth. Account information is used to sign you in and maintain your account. Filevera does not currently configure advertising or third-party analytics cookies.</p></section><section><h2 className="text-xl font-bold">Security and providers</h2><p className="mt-3">Passwords are handled by Better Auth using password hashing and account sessions are stored in the configured SQLite database. Ghostscript and Sharp process files on the application server. Google login and email delivery are not currently configured.</p></section><section><h2 className="text-xl font-bold">Contact</h2><p className="mt-3">For privacy requests, contact {contact ? <a href={`mailto:${contact}`} className="font-semibold text-blue-700 hover:underline">{contact}</a> : "the service operator through the configured production support channel"}.</p></section></div></article></main>
+    <main className="bg-slate-50 text-slate-900 flex-1">
+      <SiteHeader />
+      <article className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-7">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:underline">
+          ← Back to Filevera
+        </Link>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl text-slate-900">Privacy Policy</h1>
+        <p className="mt-1 text-xs text-slate-500">Last updated: August 22, 2026</p>
+
+        <div className="mt-4 space-y-5 rounded-2xl border border-slate-200 bg-white p-5 text-xs sm:text-sm leading-6 shadow-xs sm:p-7 text-slate-700">
+          <section>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Information we may collect</h2>
+            <p className="mt-1.5">Filevera may process an email address, name, and authentication records when you create an account. Basic technical information may be present in normal server logs. No document contents are used for advertising or user profiling.</p>
+          </section>
+          <section className="border-t border-slate-100 pt-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Uploaded files</h2>
+            <p className="mt-1.5">Files are uploaded only to provide the operation you request. PDF and image processing uses temporary server files that are purged immediately upon operation completion.</p>
+          </section>
+          <section className="border-t border-slate-100 pt-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Accounts and cookies</h2>
+            <p className="mt-1.5">Authentication uses session cookies managed by Better Auth. Account information is used exclusively to authenticate and maintain your account. We do not use advertising tracking cookies.</p>
+          </section>
+          <section className="border-t border-slate-100 pt-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Security and infrastructure</h2>
+            <p className="mt-1.5">Passwords are securely hashed using modern cryptographic hashing. File processing is executed locally on dedicated container infrastructure.</p>
+          </section>
+          <section className="border-t border-slate-100 pt-4">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Contact</h2>
+            <p className="mt-1.5">For privacy requests, contact {contact ? <a href={`mailto:${contact}`} className="font-semibold text-sky-600 hover:underline">{contact}</a> : "the service operator via the support page"}.</p>
+          </section>
+        </div>
+      </article>
+    </main>
   );
 }

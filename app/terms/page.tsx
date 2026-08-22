@@ -8,6 +8,32 @@ const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900"><SiteHeader /><article className="mx-auto max-w-3xl px-5 py-12 sm:px-8"><Link href="/" className="text-sm font-semibold text-blue-700">← Back to Filevera</Link><h1 className="mt-5 text-4xl font-bold">Terms of Service</h1><p className="mt-3 text-sm text-slate-500">Last updated: August 22, 2026</p><div className="mt-8 space-y-7 rounded-2xl border border-slate-200 bg-white p-6 text-sm leading-7 shadow-sm sm:p-10">{[["1. Service", "Filevera provides online tools for compressing, converting, merging, splitting, and resizing files."], ["2. Eligibility", "You may use Filevera only if you can form a legally binding agreement and are permitted to use the service where you live."], ["3. Acceptable use", "Use the service only for lawful purposes and files you are authorized to process. Do not upload malware, unlawful material, or files intended to attack or overload the service."], ["4. User files", "You retain responsibility for your files and their contents. You grant Filevera only the limited access needed to process a requested operation."], ["5. Processing", "Files may be temporarily processed on Filevera infrastructure. Results depend on the input, selected operation, and technical limits; no result is guaranteed to meet every desired quality or size requirement."], ["6. Availability", "The service may be unavailable, limited, or changed from time to time, including for maintenance or safety reasons."], ["7. Accounts", "Keep account credentials confidential and provide accurate information. You are responsible for activity performed through your account."], ["8. Prohibited activity", "Do not bypass limits, abuse automated endpoints, interfere with the service, upload malicious files, or use Filevera for unlawful activity."], ["9. Intellectual property", "Filevera owns its website, software, and branding. You do not transfer ownership of your uploaded documents to Filevera."], ["10. Third-party services", "Filevera uses server-side processing components, including Ghostscript and Sharp. Authentication uses Better Auth and SQLite in the configured deployment."], ["11. Disclaimer", "Filevera is provided as available. To the extent permitted by law, Filevera disclaims warranties not expressly stated in these terms."], ["12. Changes", "These terms may be updated as the service develops. The updated date above indicates the current version."], ["13. Contact", contact ? `Questions can be sent to ${contact}.` : "Questions should be sent through the configured production support channel."]].map(([heading, text]) => <section key={heading}><h2 className="text-xl font-bold">{heading}</h2><p className="mt-2">{text}</p></section>)}</div></article></main>
+    <main className="bg-slate-50 text-slate-900 flex-1">
+      <SiteHeader />
+      <article className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-7">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 hover:underline">
+          ← Back to Filevera
+        </Link>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl text-slate-900">Terms of Service</h1>
+        <p className="mt-1 text-xs text-slate-500">Last updated: August 22, 2026</p>
+
+        <div className="mt-4 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 text-xs sm:text-sm leading-6 shadow-xs sm:p-7 text-slate-700">
+          {[
+            ["1. Service", "Filevera provides online tools for compressing, converting, merging, splitting, and resizing files."],
+            ["2. Eligibility", "You may use Filevera only if you can form a legally binding agreement and are permitted to use the service where you live."],
+            ["3. Acceptable use", "Use the service only for lawful purposes and files you are authorized to process. Do not upload malware or automated denial-of-service payloads."],
+            ["4. User files", "You retain full ownership and responsibility for your files. You grant Filevera only the temporary access needed to execute your requested file operation."],
+            ["5. Processing limits", "Results depend on input file complexity, format constraints, and technical limits. No result is guaranteed to meet an arbitrary file size without visual quality trade-offs."],
+            ["6. Availability", "The service is provided as-is and may be periodically updated, upgraded, or maintained."],
+            ["7. Contact", contact ? `Questions regarding these terms can be directed to ${contact}.` : "Questions can be sent through the support page."]
+          ].map(([heading, text], index) => (
+            <section key={heading} className={index > 0 ? "border-t border-slate-100 pt-3.5" : ""}>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">{heading}</h2>
+              <p className="mt-1">{text}</p>
+            </section>
+          ))}
+        </div>
+      </article>
+    </main>
   );
 }
