@@ -24,7 +24,8 @@ interface UserUsageData {
   credits: number;
   creditsResetAt: number;
   subscriptionStatus: string;
-  hasStripeCustomer?: boolean;
+  subscriptionId?: string | null;
+  provider?: string;
   cancelAtPeriodEnd?: boolean;
   currentPeriodEnd?: number | null;
   billingInterval?: string;
@@ -37,8 +38,10 @@ export default function AccountPage() {
   const { data: session, isPending } = authClient.useSession();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const [loadingPortal, setLoadingPortal] = useState(false);
-  const [portalError, setPortalError] = useState<string | null>(null);
+  const [loadingCancel, setLoadingCancel] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UserUsageData | null>(null);
 
   useEffect(() => {
@@ -96,23 +99,23 @@ export default function AccountPage() {
     router.replace("/");
   };
 
-  const handleManageSubscription = async () => {
-    setPortalError(null);
-    setLoadingPortal(true);
+  const handleConfirmCancel = async () => {
+    setFeedbackError(null);
+    setLoadingCancel(true);
     try {
-      const res = await fetch("/api/customer-portal", { method: "POST" });
+      const res = await fetch("/api/payment/cancel-subscription", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setPortalError(data.error || "Unable to open Stripe customer billing portal.");
+        setFeedbackError(data.error || "Unable to cancel subscription.");
         return;
       }
-      if (data.url) {
-        window.location.href = data.url;
-      }
+      setCancelModalOpen(false);
+      setFeedbackNotice("Subscription scheduled for cancellation at the end of the billing period.");
+      setUsage((prev) => (prev ? { ...prev, cancelAtPeriodEnd: true } : prev));
     } catch {
-      setPortalError("Network error while connecting to billing portal.");
+      setFeedbackError("Network error while connecting to subscription service.");
     } finally {
-      setLoadingPortal(false);
+      setLoadingCancel(false);
     }
   };
 
@@ -131,23 +134,17 @@ export default function AccountPage() {
           <span className="text-xs text-slate-400">Account Dashboard</span>
         </div>
 
-        {/* Payment/Status Alerts */}
-        {subStatus === "past_due" && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs sm:text-sm text-red-900 shadow-2xs">
-            <p className="font-bold">Payment Past Due</p>
-            <p className="mt-0.5 text-xs text-red-700">
-              Your latest subscription renewal payment could not be processed. Please update your payment method to keep paid benefits active.
-            </p>
-            {usage?.hasStripeCustomer && (
-              <button
-                type="button"
-                onClick={handleManageSubscription}
-                disabled={loadingPortal}
-                className="mt-2 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors"
-              >
-                Update Payment Method
-              </button>
-            )}
+        {/* Feedback Notices */}
+        {feedbackNotice && (
+          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs sm:text-sm text-emerald-900 shadow-2xs flex items-center justify-between">
+            <p className="font-semibold">{feedbackNotice}</p>
+            <button
+              type="button"
+              onClick={() => setFeedbackNotice(null)}
+              className="text-xs font-bold text-emerald-800 underline ml-2"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -155,18 +152,18 @@ export default function AccountPage() {
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs sm:text-sm text-amber-900 shadow-2xs">
             <p className="font-semibold">Cancellation Scheduled</p>
             <p className="mt-0.5 text-xs text-amber-700">
-              Your subscription is scheduled to end on {resetDateString}. Your paid benefits will remain active until then.
+              Your subscription is scheduled to end on {resetDateString}. Your paid benefits and remaining credits will remain active until then.
             </p>
           </div>
         )}
 
-        {portalError && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-2xs">
-            <p className="font-semibold">{portalError}</p>
+        {feedbackError && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-2xs flex items-center justify-between">
+            <p className="font-semibold">{feedbackError}</p>
             <button
               type="button"
-              onClick={() => setPortalError(null)}
-              className="mt-1 text-xs text-red-700 underline"
+              onClick={() => setFeedbackError(null)}
+              className="text-xs text-red-700 underline ml-2"
             >
               Dismiss
             </button>
@@ -183,11 +180,16 @@ export default function AccountPage() {
                   <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                     {user.name || "Filevera User"}
                   </h1>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                     isPaidUser ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800"
                   }`}>
-                    {planConfig.name} Plan
+                    {planId === "pro_plus" ? "PRO PLUS" : planId === "pro" ? "PRO PLAN" : "FREE PLAN"}
                   </span>
+                  {isPaidUser && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                      ✓ Active
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
               </div>
@@ -197,11 +199,10 @@ export default function AccountPage() {
               {isPaidUser ? (
                 <button
                   type="button"
-                  onClick={handleManageSubscription}
-                  disabled={loadingPortal}
-                  className="inline-flex h-9 items-center justify-center rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 transition-colors shadow-2xs disabled:opacity-50"
+                  onClick={() => setCancelModalOpen(true)}
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
                 >
-                  {loadingPortal ? "Opening portal..." : "Manage Subscription"}
+                  Manage Subscription
                 </button>
               ) : (
                 <Link
@@ -240,7 +241,9 @@ export default function AccountPage() {
               <div className="mt-4 space-y-3 text-xs">
                 <div className="flex justify-between items-center text-slate-600">
                   <span>Current Tier:</span>
-                  <span className="font-semibold text-slate-900">{planConfig.name}</span>
+                  <span className="font-semibold text-slate-900">
+                    {planId === "pro_plus" ? "PRO PLUS" : planId === "pro" ? "PRO PLAN" : "FREE PLAN"}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
                   <span>Price / Billing:</span>
@@ -249,24 +252,26 @@ export default function AccountPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
+                  <span>Monthly Allowance:</span>
+                  <span className="font-semibold text-slate-900">{allowance.toLocaleString()} credits/month</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
                   <span>Status:</span>
                   <span className={`font-semibold capitalize ${
                     subStatus === "active" ? "text-emerald-700" : "text-amber-700"
                   }`}>
-                    {subStatus}
+                    {subStatus === "active" ? "✓ Active" : subStatus}
                   </span>
                 </div>
+                {usage?.subscriptionId && (
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>Subscription ID:</span>
+                    <span className="font-mono text-[11px] font-semibold text-slate-800">{usage.subscriptionId}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>Max PDF Upload:</span>
-                  <span className="font-semibold text-slate-900">{planConfig.maxPdfSizeMB} MB</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Max Image Upload:</span>
-                  <span className="font-semibold text-slate-900">{planConfig.maxImageSizeMB} MB</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Batch Processing:</span>
-                  <span className="font-semibold text-slate-900">Up to {planConfig.maxBatchCount} files</span>
+                  <span>Next Renewal:</span>
+                  <span className="font-semibold text-slate-900">{resetDateString}</span>
                 </div>
               </div>
             </div>
@@ -275,11 +280,10 @@ export default function AccountPage() {
               {isPaidUser ? (
                 <button
                   type="button"
-                  onClick={handleManageSubscription}
-                  disabled={loadingPortal}
-                  className="text-xs font-semibold text-sky-600 hover:underline"
+                  onClick={() => setCancelModalOpen(true)}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 underline"
                 >
-                  Manage billing & invoices →
+                  Manage / Cancel Subscription →
                 </button>
               ) : (
                 <Link
@@ -307,11 +311,11 @@ export default function AccountPage() {
                   <div className="flex items-baseline justify-between">
                     <div>
                       <p className="text-[11px] font-medium text-slate-500">Credits Remaining</p>
-                      <p className="mt-1 text-2xl sm:text-3xl font-black text-slate-900">{credits}</p>
+                      <p className="mt-1 text-2xl sm:text-3xl font-black text-slate-900">{credits.toLocaleString()}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[11px] font-medium text-slate-500">Monthly Allowance</p>
-                      <p className="mt-1 text-sm font-bold text-slate-700">{credits} / {allowance}</p>
+                      <p className="mt-1 text-sm font-bold text-slate-700">{credits.toLocaleString()} / {allowance.toLocaleString()}</p>
                     </div>
                   </div>
 
@@ -481,6 +485,37 @@ export default function AccountPage() {
           </section>
         </div>
       </div>
+
+      {/* Cancel Subscription Confirmation Modal */}
+      {cancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900">Manage Subscription</h3>
+            <p className="mt-2 text-xs leading-relaxed text-slate-600">
+              Are you sure you want to cancel your {planConfig.name} subscription? Your paid features and remaining credits will remain active until <strong>{resetDateString}</strong>. You will not be billed again after this period.
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelModalOpen(false)}
+                disabled={loadingCancel}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Keep Plan
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={loadingCancel}
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {loadingCancel ? "Processing..." : "Confirm Cancellation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

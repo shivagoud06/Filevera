@@ -119,10 +119,13 @@ export async function ensureDbInitialized(): Promise<void> {
           CREATE TABLE IF NOT EXISTS subscription (
             id TEXT PRIMARY KEY NOT NULL,
             "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+            provider TEXT NOT NULL DEFAULT 'razorpay',
+            "providerSubscriptionId" TEXT,
+            "providerPaymentId" TEXT,
             plan TEXT NOT NULL,
             "subscriptionStatus" TEXT NOT NULL DEFAULT 'active',
             "stripeCustomerId" TEXT,
-            "stripeSubscriptionId" TEXT UNIQUE,
+            "stripeSubscriptionId" TEXT,
             "stripePriceId" TEXT,
             "billingInterval" TEXT,
             "introOfferUsed" BOOLEAN NOT NULL DEFAULT FALSE,
@@ -134,8 +137,28 @@ export async function ensureDbInitialized(): Promise<void> {
           );
 
           CREATE INDEX IF NOT EXISTS idx_subscription_user_id ON subscription("userId");
-          CREATE INDEX IF NOT EXISTS idx_subscription_stripe_cust ON subscription("stripeCustomerId");
+          CREATE INDEX IF NOT EXISTS idx_subscription_provider_sub ON subscription("providerSubscriptionId");
           CREATE INDEX IF NOT EXISTS idx_subscription_stripe_sub ON subscription("stripeSubscriptionId");
+
+          CREATE TABLE IF NOT EXISTS payments (
+            id TEXT PRIMARY KEY NOT NULL,
+            "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+            provider TEXT NOT NULL DEFAULT 'razorpay',
+            "providerPaymentId" TEXT UNIQUE,
+            "subscriptionId" TEXT,
+            amount INTEGER NOT NULL,
+            currency TEXT NOT NULL DEFAULT 'INR',
+            status TEXT NOT NULL,
+            "createdAt" BIGINT NOT NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments("userId");
+
+          CREATE TABLE IF NOT EXISTS razorpay_event (
+            id TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL,
+            "createdAt" BIGINT NOT NULL
+          );
 
           CREATE TABLE IF NOT EXISTS stripe_event (
             id TEXT PRIMARY KEY NOT NULL,

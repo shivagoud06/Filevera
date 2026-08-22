@@ -130,14 +130,14 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
                 }`} />
                 <span>
                   {creditsData?.plan === "pro_plus"
-                    ? "Pro Plus"
+                    ? "PRO PLUS"
                     : creditsData?.plan === "pro"
-                    ? "Pro Plan"
-                    : "Free Plan"}
+                    ? "PRO PLAN"
+                    : "FREE PLAN"}
                 </span>
               </div>
               <div className="rounded-lg bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">
-                {credits} credit{credits === 1 ? "" : "s"}
+                {credits.toLocaleString()} credits
               </div>
             </div>
           </div>

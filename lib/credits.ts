@@ -3,8 +3,6 @@ import { getPlan, PlanId, PLANS } from "./plans";
 import { dbQuery } from "./db";
 import {
   OperationType,
-  OPERATION_COSTS,
-  OPERATION_LABELS,
   getOperationCost,
   getOperationLabel,
 } from "./credit-constants";

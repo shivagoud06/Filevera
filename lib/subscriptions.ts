@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { dbQuery } from "./db";
 import { PlanId, PLANS } from "./plans";
-import { stripe } from "./stripe";
+import { razorpay } from "./razorpay";
 
 export interface SubscriptionRecord {
   id: string;
   userId: string;
+  provider: string;
+  providerSubscriptionId: string | null;
+  providerPaymentId: string | null;
   plan: PlanId;
   subscriptionStatus: string;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-  stripePriceId: string | null;
   billingInterval: string | null;
   introOfferUsed: boolean;
   currentPeriodStart: number | null;
@@ -24,11 +24,14 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionR
   const result = await dbQuery<{
     id: string;
     userId: string;
+    provider?: string;
+    providerSubscriptionId?: string | null;
+    providerPaymentId?: string | null;
     plan: PlanId;
     subscriptionStatus: string;
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
-    stripePriceId: string | null;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    stripePriceId?: string | null;
     billingInterval: string | null;
     introOfferUsed: boolean;
     currentPeriodStart: number | string | null;
@@ -45,9 +48,18 @@ export async function getUserSubscription(userId: string): Promise<SubscriptionR
   if (!row) return null;
 
   return {
-    ...row,
+    id: row.id,
+    userId: row.userId,
+    provider: row.provider || "razorpay",
+    providerSubscriptionId: row.providerSubscriptionId || row.stripeSubscriptionId || null,
+    providerPaymentId: row.providerPaymentId || null,
+    plan: row.plan,
+    subscriptionStatus: row.subscriptionStatus,
+    billingInterval: row.billingInterval,
+    introOfferUsed: Boolean(row.introOfferUsed),
     currentPeriodStart: row.currentPeriodStart ? Number(row.currentPeriodStart) : null,
     currentPeriodEnd: row.currentPeriodEnd ? Number(row.currentPeriodEnd) : null,
+    cancelAtPeriodEnd: Boolean(row.cancelAtPeriodEnd),
     createdAt: Number(row.createdAt),
     updatedAt: Number(row.updatedAt),
   };
@@ -57,197 +69,139 @@ export async function isUserIntroEligible(userId: string, plan: "pro" | "pro_plu
   const result = await dbQuery<{ count: string | number }>(
     `SELECT COUNT(*) as count 
      FROM subscription 
-     WHERE "userId" = $1 AND plan = $2 AND ("introOfferUsed" = true OR "subscriptionStatus" IN ('active', 'past_due', 'canceled'))`,
+     WHERE "userId" = $1 AND plan = $2 AND ("introOfferUsed" = true OR "subscriptionStatus" IN ('active', 'past_due', 'completed', 'canceled'))`,
     [userId, plan]
   );
   const count = Number(result.rows[0]?.count || 0);
   return count === 0;
 }
 
-export async function getOrCreateStripeCustomer(
-  userId: string,
-  email: string,
-  name?: string
-): Promise<string | null> {
-  if (!stripe) return null;
-
-  // Check if we already have a customer ID stored for this user
-  const existingSub = await dbQuery<{ stripeCustomerId: string | null }>(
-    'SELECT "stripeCustomerId" FROM subscription WHERE "userId" = $1 AND "stripeCustomerId" IS NOT NULL LIMIT 1',
-    [userId]
-  );
-  if (existingSub.rows[0]?.stripeCustomerId) {
-    return existingSub.rows[0].stripeCustomerId;
-  }
-
-  // Check in Stripe by email
-  const existingCustomers = await stripe.customers.list({
-    email,
-    limit: 1,
-  });
-
-  if (existingCustomers.data.length > 0) {
-    const customerId = existingCustomers.data[0].id;
-    return customerId;
-  }
-
-  // Create new customer in Stripe
-  const newCustomer = await stripe.customers.create({
-    email,
-    name: name || undefined,
-    metadata: {
-      userId,
-    },
-  });
-
-  return newCustomer.id;
-}
-
-export async function isStripeEventProcessed(eventId: string): Promise<boolean> {
-  const result = await dbQuery<{ count: string | number }>(
-    "SELECT COUNT(*) as count FROM stripe_event WHERE id = $1",
-    [eventId]
-  );
-  return Number(result.rows[0]?.count || 0) > 0;
-}
-
-export async function recordStripeEvent(eventId: string, type: string): Promise<boolean> {
-  const now = Date.now();
-  const insertResult = await dbQuery(
-    "INSERT INTO stripe_event (id, type, \"createdAt\") VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
-    [eventId, type, now]
-  );
-  return (insertResult.rowCount ?? 0) > 0;
-}
-
-export async function activateSubscriptionFromCheckout(params: {
+export async function recordPayment(params: {
   userId: string;
-  plan: PlanId;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-  stripePriceId: string | null;
-  billingInterval: string;
-  introOfferUsed: boolean;
-  currentPeriodStart: number;
-  currentPeriodEnd: number;
+  provider?: string;
+  providerPaymentId: string;
+  subscriptionId?: string | null;
+  amount: number;
+  currency?: string;
+  status: string;
 }): Promise<void> {
   const now = Date.now();
+  const id = randomUUID();
+  await dbQuery(
+    `INSERT INTO payments (id, "userId", provider, "providerPaymentId", "subscriptionId", amount, currency, status, "createdAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT ("providerPaymentId") DO UPDATE 
+     SET status = EXCLUDED.status`,
+    [
+      id,
+      params.userId,
+      params.provider || "razorpay",
+      params.providerPaymentId,
+      params.subscriptionId || null,
+      params.amount,
+      params.currency || "INR",
+      params.status,
+      now,
+    ]
+  );
+}
+
+export async function activateSubscription(params: {
+  userId: string;
+  provider?: string;
+  providerSubscriptionId?: string | null;
+  providerPaymentId?: string | null;
+  plan: "pro" | "pro_plus";
+  billingInterval: "month" | "year";
+  introOfferUsed: boolean;
+  currentPeriodStart?: number;
+  currentPeriodEnd?: number;
+}): Promise<void> {
+  const now = Date.now();
+  const periodDuration = params.billingInterval === "year" ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+  const start = params.currentPeriodStart || now;
+  const end = params.currentPeriodEnd || now + periodDuration;
   const subId = randomUUID();
 
-  // Insert or update subscription record
+  // 1. Insert or update subscription record
   await dbQuery(
     `INSERT INTO subscription (
-      id, "userId", plan, "subscriptionStatus", "stripeCustomerId", "stripeSubscriptionId",
-      "stripePriceId", "billingInterval", "introOfferUsed", "currentPeriodStart",
-      "currentPeriodEnd", "cancelAtPeriodEnd", "createdAt", "updatedAt"
-    ) VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, false, $11, $11)
-    ON CONFLICT ("stripeSubscriptionId") DO UPDATE SET
-      plan = EXCLUDED.plan,
-      "subscriptionStatus" = 'active',
-      "stripePriceId" = EXCLUDED."stripePriceId",
-      "billingInterval" = EXCLUDED."billingInterval",
-      "introOfferUsed" = EXCLUDED."introOfferUsed",
-      "currentPeriodStart" = EXCLUDED."currentPeriodStart",
-      "currentPeriodEnd" = EXCLUDED."currentPeriodEnd",
-      "updatedAt" = EXCLUDED."updatedAt"`,
+      id, "userId", provider, "providerSubscriptionId", "providerPaymentId", 
+      plan, "subscriptionStatus", "billingInterval", "introOfferUsed", 
+      "currentPeriodStart", "currentPeriodEnd", "cancelAtPeriodEnd", "createdAt", "updatedAt"
+    ) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9, $10, false, $11, $12)`,
     [
       subId,
       params.userId,
+      params.provider || "razorpay",
+      params.providerSubscriptionId || null,
+      params.providerPaymentId || null,
       params.plan,
-      params.stripeCustomerId,
-      params.stripeSubscriptionId,
-      params.stripePriceId,
       params.billingInterval,
       params.introOfferUsed,
-      params.currentPeriodStart,
-      params.currentPeriodEnd,
+      start,
+      end,
+      now,
       now,
     ]
   );
 
-  // Allocate monthly credits according to activated plan
-  const planConfig = PLANS[params.plan] || PLANS.free;
+  // 2. Update user_usage table with appropriate credit allocation
+  const planConfig = PLANS[params.plan];
   const newCredits = planConfig.monthlyCredits;
-  const resetAt = params.currentPeriodEnd;
 
   await dbQuery(
     `INSERT INTO user_usage ("userId", plan, credits, "creditsResetAt", "subscriptionStatus", "updatedAt")
      VALUES ($1, $2, $3, $4, 'active', $5)
-     ON CONFLICT ("userId") DO UPDATE SET
-       plan = EXCLUDED.plan,
-       credits = EXCLUDED.credits,
-       "creditsResetAt" = EXCLUDED."creditsResetAt",
-       "subscriptionStatus" = 'active',
-       "updatedAt" = EXCLUDED."updatedAt"`,
-    [params.userId, params.plan, newCredits, resetAt, now]
+     ON CONFLICT ("userId") DO UPDATE
+     SET plan = EXCLUDED.plan,
+         credits = EXCLUDED.credits,
+         "creditsResetAt" = EXCLUDED."creditsResetAt",
+         "subscriptionStatus" = 'active',
+         "updatedAt" = EXCLUDED."updatedAt"`,
+    [params.userId, params.plan, newCredits, end, now]
   );
 }
 
-export async function syncSubscriptionStatus(params: {
-  stripeSubscriptionId: string;
-  status: string;
-  currentPeriodStart?: number;
-  currentPeriodEnd?: number;
-  cancelAtPeriodEnd?: boolean;
-}): Promise<void> {
+export async function cancelSubscription(userId: string): Promise<{ success: boolean; error?: string }> {
+  const sub = await getUserSubscription(userId);
+  if (!sub || !sub.providerSubscriptionId) {
+    return { success: false, error: "No active subscription found to cancel." };
+  }
+
+  // If Razorpay subscription, cancel via Razorpay API
+  if (razorpay && sub.providerSubscriptionId.startsWith("sub_")) {
+    try {
+      await razorpay.subscriptions.cancel(sub.providerSubscriptionId, true); // true = cancel at end of cycle
+    } catch (err) {
+      console.warn("Razorpay API subscription cancel notice:", err);
+    }
+  }
+
   const now = Date.now();
-  const subResult = await dbQuery<{ userId: string; plan: PlanId }>(
-    'SELECT "userId", plan FROM subscription WHERE "stripeSubscriptionId" = $1 LIMIT 1',
-    [params.stripeSubscriptionId]
-  );
-
-  const sub = subResult.rows[0];
-  if (!sub) return;
-
   await dbQuery(
     `UPDATE subscription 
-     SET "subscriptionStatus" = $1, 
-         "currentPeriodStart" = COALESCE($2, "currentPeriodStart"), 
-         "currentPeriodEnd" = COALESCE($3, "currentPeriodEnd"), 
-         "cancelAtPeriodEnd" = COALESCE($4, "cancelAtPeriodEnd"), 
-         "updatedAt" = $5
-     WHERE "stripeSubscriptionId" = $6`,
-    [
-      params.status,
-      params.currentPeriodStart || null,
-      params.currentPeriodEnd || null,
-      params.cancelAtPeriodEnd !== undefined ? params.cancelAtPeriodEnd : null,
-      now,
-      params.stripeSubscriptionId,
-    ]
+     SET "cancelAtPeriodEnd" = true, "updatedAt" = $1 
+     WHERE "userId" = $2 AND "subscriptionStatus" = 'active'`,
+    [now, userId]
   );
 
-  const isStillActive = params.status === "active" || params.status === "trialing";
-  const userPlan = isStillActive ? sub.plan : "free";
-
-  await dbQuery(
-    `UPDATE user_usage 
-     SET plan = $1, "subscriptionStatus" = $2, "updatedAt" = $3
-     WHERE "userId" = $4`,
-    [userPlan, params.status, now, sub.userId]
-  );
+  return { success: true };
 }
 
-export async function renewSubscriptionCredits(params: {
-  stripeSubscriptionId: string;
-  currentPeriodEnd: number;
-}): Promise<void> {
+export async function processRazorpayWebhookEvent(
+  eventId: string,
+  eventType: string
+): Promise<boolean> {
+  // Idempotency check
   const now = Date.now();
-  const subResult = await dbQuery<{ userId: string; plan: PlanId }>(
-    'SELECT "userId", plan FROM subscription WHERE "stripeSubscriptionId" = $1 LIMIT 1',
-    [params.stripeSubscriptionId]
-  );
-
-  const sub = subResult.rows[0];
-  if (!sub) return;
-
-  const planConfig = PLANS[sub.plan] || PLANS.free;
-  const newCredits = planConfig.monthlyCredits;
-
-  await dbQuery(
-    `UPDATE user_usage 
-     SET credits = $1, "creditsResetAt" = $2, "updatedAt" = $3
-     WHERE "userId" = $4`,
-    [newCredits, params.currentPeriodEnd, now, sub.userId]
-  );
+  try {
+    await dbQuery(
+      'INSERT INTO razorpay_event (id, type, "createdAt") VALUES ($1, $2, $3)',
+      [eventId, eventType, now]
+    );
+    return true; // First time processing
+  } catch {
+    return false; // Already processed
+  }
 }

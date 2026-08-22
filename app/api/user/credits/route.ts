@@ -5,6 +5,9 @@ import { ensureUserUsage, getUserCreditHistory } from "@/lib/credits";
 import { getPlan } from "@/lib/plans";
 import { getUserSubscription, isUserIntroEligible } from "@/lib/subscriptions";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const reqHeaders = await headers();
@@ -23,6 +26,16 @@ export async function GET() {
     const monthlyAllowance = plan.monthlyCredits;
     const creditsUsedThisCycle = Math.max(0, monthlyAllowance - usage.credits);
 
+    let maskedSubscriptionId: string | null = null;
+    if (sub?.providerSubscriptionId) {
+      const raw = sub.providerSubscriptionId;
+      if (raw.length > 8) {
+        maskedSubscriptionId = `${raw.slice(0, 4)}••••${raw.slice(-4)}`;
+      } else {
+        maskedSubscriptionId = raw;
+      }
+    }
+
     return NextResponse.json({
       userId: session.user.id,
       plan: usage.plan,
@@ -30,7 +43,8 @@ export async function GET() {
       credits: usage.credits,
       creditsResetAt: usage.creditsResetAt,
       subscriptionStatus: usage.subscriptionStatus,
-      hasStripeCustomer: Boolean(sub?.stripeCustomerId),
+      subscriptionId: maskedSubscriptionId,
+      provider: sub?.provider || "razorpay",
       cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
       currentPeriodEnd: sub?.currentPeriodEnd || null,
       billingInterval: sub?.billingInterval || (usage.plan === "pro_plus" ? "year" : "month"),
