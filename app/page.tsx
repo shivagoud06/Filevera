@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import SiteHeader from "@/app/components/site-header";
 import HomeSearch from "@/app/components/home-search";
+import FeedbackModal from "@/app/components/feedback-modal";
 import { toolsInCategory, toolCategories } from "@/lib/tools";
+import { FeedbackItem } from "@/lib/feedback";
 import {
   IconPdf,
   IconImage,
@@ -116,7 +118,24 @@ const IMAGE_PRESETS = [
 
 export default function HomePage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const activeCategories = toolCategories.filter((category) => toolsInCategory(category).length > 0);
+
+  const fetchFeedback = () => {
+    fetch("/api/feedback?limit=6")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.items) {
+          setFeedbackList(data.items);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchFeedback();
+  }, []);
 
   return (
     <main className="bg-slate-50 text-slate-900 flex-1 flex flex-col">
@@ -547,6 +566,78 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 9.5. COMMUNITY FEEDBACK SECTION: "What people say about Filevera" */}
+      <section className="px-4 py-10 sm:px-6 sm:py-12 mx-auto w-full max-w-5xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
+              User Reviews
+            </span>
+            <h2 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              What people say about Filevera
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Honest ratings and impressions from real users.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setFeedbackModalOpen(true)}
+            className="self-start sm:self-auto inline-flex h-9 items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-semibold text-white hover:bg-sky-600 shadow-2xs transition-colors"
+          >
+            ✍ Share Your Feedback
+          </button>
+        </div>
+
+        {feedbackList.length === 0 ? (
+          /* Real Empty State - Zero Fake Testimonials */
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-center shadow-2xs">
+            <p className="text-sm font-semibold text-slate-700">No reviews yet</p>
+            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+              Be the first to share your experience with Filevera!
+            </p>
+            <button
+              type="button"
+              onClick={() => setFeedbackModalOpen(true)}
+              className="mt-3.5 inline-flex h-8 items-center justify-center rounded-lg bg-sky-50 px-3.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition-colors"
+            >
+              Write First Review →
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {feedbackList.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-amber-400 text-xs">
+                      {"★".repeat(item.rating)}
+                      {"☆".repeat(5 - item.rating)}
+                    </div>
+                    {item.tool && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                        {item.tool}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2.5 text-xs text-slate-700 leading-relaxed italic">
+                    &ldquo;{item.message}&rdquo;
+                  </p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-800">— {item.displayName}</span>
+                  <span>{new Date(item.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* 10. SECTION G: FAQ Section */}
       <section className="bg-white border-y border-slate-200/80 px-4 py-10 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-3xl">
@@ -611,6 +702,12 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      <FeedbackModal
+        isOpen={feedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        onSubmitted={() => fetchFeedback()}
+      />
     </main>
   );
 }

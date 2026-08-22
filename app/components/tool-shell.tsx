@@ -4,7 +4,9 @@ import { ReactNode, useState } from "react";
 import Link from "next/link";
 import SiteHeader from "./site-header";
 import Breadcrumbs from "./breadcrumbs";
+import FeedbackModal from "./feedback-modal";
 import { IconShield, IconBolt, IconFree, IconDevice, IconLock } from "./ui-icons";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 export interface FaqItem {
   question: string;
@@ -54,6 +56,8 @@ export default function ToolShell({
   children
 }: ToolShellProps) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [feedbackVote, setFeedbackVote] = useState<"yes" | "no" | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <main className="bg-slate-50 text-slate-900 flex-1 flex flex-col">
@@ -179,9 +183,49 @@ export default function ToolShell({
           </Link>
         </section>
 
+        {/* Subtle Tool Feedback Prompt */}
+        <section className="mt-5 mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white px-4 py-3 text-center flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-2xs">
+          <p className="text-xs text-slate-600">
+            {feedbackVote === null
+              ? `Was ${title} useful for your file?`
+              : feedbackVote === "yes"
+              ? "Glad we could help! Want to share a quick review?"
+              : "Sorry to hear that! Help us improve:"}
+          </p>
+
+          <div className="flex items-center gap-2">
+            {feedbackVote === null ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackVote("yes")}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  👍 Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackVote("no")}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  👎 No
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="text-xs font-semibold text-sky-600 hover:underline"
+              >
+                Tell us what you think →
+              </button>
+            )}
+          </div>
+        </section>
+
         {/* Tool FAQs Accordion */}
         {faqs && faqs.length > 0 && (
-          <section className="mt-6 mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs" aria-labelledby="faq-title">
+          <section className="mt-5 mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xs" aria-labelledby="faq-title">
             <h2 id="faq-title" className="text-sm sm:text-base font-bold text-slate-900 text-center">
               Frequently Asked Questions
             </h2>
@@ -210,7 +254,24 @@ export default function ToolShell({
             </div>
           </section>
         )}
+
+        {/* Subtle Bottom Support Line */}
+        <div className="mt-7 text-center text-xs text-slate-500">
+          <span>Having trouble with this tool? Contact support: </span>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className="font-bold text-slate-800 hover:text-sky-500 transition-colors underline underline-offset-2 decoration-sky-300 hover:decoration-sky-500 break-all"
+          >
+            {SUPPORT_EMAIL}
+          </a>
+        </div>
       </div>
+
+      <FeedbackModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        defaultTool={title}
+      />
     </main>
   );
 }

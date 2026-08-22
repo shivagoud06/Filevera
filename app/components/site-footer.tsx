@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 export default function SiteFooter() {
     return (
@@ -11,7 +12,22 @@ export default function SiteFooter() {
                     <p className="mt-2 max-w-xs text-xs leading-5 text-slate-500">
                         Simple tools for every file. Fast, secure, and private browser-based utilities.
                     </p>
-                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                    
+                    {/* Compact Customer Support Area */}
+                    <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/60 p-3.5 max-w-sm text-xs text-slate-700">
+                        <p className="font-bold text-slate-900 text-xs sm:text-sm">Need help?</p>
+                        <p className="mt-1 text-[11px] leading-4 text-slate-600">
+                            For any issues with Filevera, file processing, accounts, or general support, contact us at:
+                        </p>
+                        <a
+                            href={`mailto:${SUPPORT_EMAIL}`}
+                            className="mt-1.5 inline-block font-bold text-slate-900 hover:text-sky-500 transition-colors break-all underline underline-offset-2 decoration-sky-300 hover:decoration-sky-500"
+                        >
+                            {SUPPORT_EMAIL}
+                        </a>
+                    </div>
+
+                    <div className="mt-3.5 flex items-center gap-2 text-xs text-slate-400">
                         <span>🔒 256-bit TLS Encrypted</span>
                         <span>•</span>
                         <span>⚡ Zero Install</span>
@@ -25,6 +41,7 @@ export default function SiteFooter() {
                         <li><Link href="/split-pdf" className="text-slate-600 hover:text-sky-600 transition-colors">Split PDF</Link></li>
                         <li><Link href="/jpg-to-pdf" className="text-slate-600 hover:text-sky-600 transition-colors">JPG to PDF</Link></li>
                         <li><Link href="/pdf-to-jpg" className="text-slate-600 hover:text-sky-600 transition-colors">PDF to JPG</Link></li>
+                        <li><Link href="/pricing" className="text-slate-600 hover:text-sky-600 transition-colors font-medium">Plans & Pricing</Link></li>
                     </ul>
                 </div>
                 <div>
@@ -37,9 +54,12 @@ export default function SiteFooter() {
                     </ul>
                 </div>
                 <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Legal & Support</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Support & Community</h3>
                     <ul className="mt-2.5 space-y-2 text-xs">
-                        <li><Link href="/contact" className="text-slate-600 hover:text-sky-600 transition-colors">Contact Support</Link></li>
+                        <li><Link href="/support" className="text-slate-600 hover:text-sky-600 transition-colors font-medium">Customer Support</Link></li>
+                        <li><Link href="/contact" className="text-slate-600 hover:text-sky-600 transition-colors">Contact</Link></li>
+                        <li><Link href="/#faq" className="text-slate-600 hover:text-sky-600 transition-colors">FAQ</Link></li>
+                        <li><Link href="/feedback" className="text-slate-600 hover:text-sky-600 transition-colors">Reviews & Feedback</Link></li>
                         <li><Link href="/privacy" className="text-slate-600 hover:text-sky-600 transition-colors">Privacy Policy</Link></li>
                         <li><Link href="/terms" className="text-slate-600 hover:text-sky-600 transition-colors">Terms of Service</Link></li>
                     </ul>

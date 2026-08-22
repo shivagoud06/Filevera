@@ -34,7 +34,7 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
                 : await authClient.signIn.email({ email, password });
             if (result.error) throw new Error(isSignup ? "Unable to create your account right now. Please try again." : "Email or password is incorrect.");
             setSuccess(isSignup ? "Your account is ready." : "You are signed in.");
-            router.push("/account");
+            router.push("/");
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : "Unable to complete this request right now. Please try again.");
         } finally {
@@ -49,7 +49,7 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
             return;
         }
         setPending(true);
-        const result = await authClient.signIn.social({ provider: "google", callbackURL: "/account" });
+        const result = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
         if (result.error) {
             setGoogleMessage("Google sign-in is currently unavailable. Please try again later.");
             setPending(false);

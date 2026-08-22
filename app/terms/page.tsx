@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import SiteHeader from "@/app/components/site-header";
 import { pageMetadata } from "@/lib/seo";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = pageMetadata("/terms", "Terms of Service | Filevera", "Terms for using Filevera online file-processing tools and accounts.");
-const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 export default function TermsPage() {
   return (
@@ -25,7 +25,7 @@ export default function TermsPage() {
             ["4. User files", "You retain full ownership and responsibility for your files. You grant Filevera only the temporary access needed to execute your requested file operation."],
             ["5. Processing limits", "Results depend on input file complexity, format constraints, and technical limits. No result is guaranteed to meet an arbitrary file size without visual quality trade-offs."],
             ["6. Availability", "The service is provided as-is and may be periodically updated, upgraded, or maintained."],
-            ["7. Contact", contact ? `Questions regarding these terms can be directed to ${contact}.` : "Questions can be sent through the support page."]
+            ["7. Contact", `Questions regarding these terms can be directed to our support team at ${SUPPORT_EMAIL}.`]
           ].map(([heading, text], index) => (
             <section key={heading} className={index > 0 ? "border-t border-slate-100 pt-3.5" : ""}>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">{heading}</h2>

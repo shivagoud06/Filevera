@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AuthForm from "./auth-form";
 import AuthShell from "./auth-shell";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 export default function AuthPage({ mode, googleConfigured = false }: { mode: "login" | "signup"; googleConfigured?: boolean }) {
     const isSignup = mode === "signup";
@@ -23,6 +24,17 @@ export default function AuthPage({ mode, googleConfigured = false }: { mode: "lo
                         {isSignup ? "Log in" : "Sign up"}
                     </Link>
                 </p>
+
+                {/* Subtle Support Link */}
+                <div className="mt-4 pt-3 border-t border-slate-100 text-center text-[11px] text-slate-500">
+                    <span>Need help? Contact support: </span>
+                    <a
+                        href={`mailto:${SUPPORT_EMAIL}`}
+                        className="font-bold text-slate-800 hover:text-sky-500 transition-colors underline underline-offset-2 decoration-sky-300 hover:decoration-sky-500 break-all"
+                    >
+                        {SUPPORT_EMAIL}
+                    </a>
+                </div>
             </div>
         </AuthShell>
     );

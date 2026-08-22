@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import SiteHeader from "@/app/components/site-header";
 import { pageMetadata } from "@/lib/seo";
+import { SUPPORT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = pageMetadata("/privacy", "Privacy Policy | Filevera", "How Filevera handles accounts, uploaded files, cookies, and service operations.");
-const contact = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 export default function PrivacyPage() {
   return (
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
           </section>
           <section className="border-t border-slate-100 pt-4">
             <h2 className="text-sm sm:text-base font-bold text-slate-900">Contact</h2>
-            <p className="mt-1.5">For privacy requests, contact {contact ? <a href={`mailto:${contact}`} className="font-semibold text-sky-600 hover:underline">{contact}</a> : "the service operator via the support page"}.</p>
+            <p className="mt-1.5">For privacy inquiries and data requests, contact our support team at <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-sky-600 hover:underline break-all">{SUPPORT_EMAIL}</a>.</p>
           </section>
         </div>
       </article>
