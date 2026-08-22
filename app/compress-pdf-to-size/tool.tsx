@@ -15,6 +15,8 @@ type Result = {
     targetBytes: number;
     reachedTarget: boolean;
     downloadUrl: string;
+    creditsUsed?: number;
+    creditsRemaining?: number;
 };
 
 function reduction(original: number, compressed: number) {
@@ -107,12 +109,17 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
             }
             const compressed = await response.blob();
             if (!targetBytes) throw new Error("Choose a valid target size.");
+            const creditsUsed = Number(response.headers.get("X-Credits-Used")) || 5;
+            const creditsRemaining = Number(response.headers.get("X-Credits-Remaining")) || 0;
+
             setResult({
                 originalSize: Number(response.headers.get("X-Original-Size")) || file.size,
                 compressedSize: Number(response.headers.get("X-Compressed-Size")) || compressed.size,
                 targetBytes,
                 reachedTarget: response.headers.get("X-Target-Reached") === "true",
                 downloadUrl: URL.createObjectURL(compressed),
+                creditsUsed,
+                creditsRemaining,
             });
             trackToolEvent("processing_success", "compress-pdf");
         } catch (caught) {
@@ -230,11 +237,18 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
 
                 {result && (
                     <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4" role="status">
-                        <div className="flex items-center gap-2">
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
-                            <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">
-                                {result.reachedTarget ? "Target size achieved" : "Best achievable compression ready"}
-                            </h2>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
+                                <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">
+                                    {result.reachedTarget ? "Target size achieved" : "Best achievable compression ready"}
+                                </h2>
+                            </div>
+                            {typeof result.creditsUsed === "number" && (
+                                <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                                    ✓ {result.creditsUsed} credits used {typeof result.creditsRemaining === "number" ? `• ${result.creditsRemaining} remaining` : ""}
+                                </span>
+                            )}
                         </div>
                         <p className="mt-0.5 text-xs text-emerald-900">
                             {result.reachedTarget
@@ -268,7 +282,37 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
                     </div>
                 )}
 
-                {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">{error}</p>}
+                {error && (
+                    <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+                        <p className="font-semibold">{error}</p>
+                        {error.includes("credit") && (
+                            <div className="mt-2 flex items-center gap-2">
+                                <a
+                                    href="/pricing"
+                                    className="rounded-lg bg-sky-500 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-600 shadow-2xs"
+                                >
+                                    Get Pro
+                                </a>
+                                <a
+                                    href="/pricing"
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    Upgrade Plan
+                                </a>
+                            </div>
+                        )}
+                        {error.includes("log in") && (
+                            <div className="mt-2">
+                                <a
+                                    href="/login"
+                                    className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 shadow-2xs"
+                                >
+                                    Log In to Filevera
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </ToolShell>
     );

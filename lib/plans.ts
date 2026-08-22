@@ -7,6 +7,12 @@ export interface PlanDefinition {
   tagline: string;
   price: string;
   period: string;
+  regularPrice?: string;
+  regularPeriod?: string;
+  introPrice?: string;
+  introPeriod?: string;
+  savingsBadge?: string;
+  recurringNotice?: string;
   popular?: boolean;
   starterCredits: number;
   monthlyCredits: number;
@@ -22,7 +28,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: "free",
     name: "Free",
     tagline: "Essential file tools for everyday use and trial.",
-    price: "$0",
+    price: "₹0",
     period: "forever",
     starterCredits: Number(process.env.FREE_STARTER_CREDITS || 100),
     monthlyCredits: Number(process.env.FREE_MONTHLY_CREDITS || 50),
@@ -43,10 +49,15 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   pro: {
     id: "pro",
     name: "Pro",
-    badge: "Recommended",
-    tagline: "For professionals and regular heavy users.",
-    price: "$9",
-    period: "/month",
+    badge: "First-Time Offer",
+    tagline: "For creators, students, and professionals.",
+    price: "₹99",
+    period: "first month",
+    regularPrice: "₹149",
+    regularPeriod: "/month",
+    introPrice: "₹99",
+    introPeriod: "First month only",
+    recurringNotice: "Then ₹149/month recurring",
     popular: true,
     starterCredits: Number(process.env.PRO_MONTHLY_CREDITS || 1000),
     monthlyCredits: Number(process.env.PRO_MONTHLY_CREDITS || 1000),
@@ -67,10 +78,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   pro_plus: {
     id: "pro_plus",
     name: "Pro Plus",
-    badge: "Power User",
-    tagline: "For demanding workflows and large document batches.",
-    price: "$19",
-    period: "/month",
+    badge: "Best Value",
+    tagline: "For power users and demanding document workflows.",
+    price: "₹1,499",
+    period: "first year",
+    regularPrice: "₹1,788",
+    regularPeriod: "/year",
+    introPrice: "₹1,499",
+    introPeriod: "First year only",
+    savingsBadge: "₹289 saved (~₹125/mo equivalent)",
+    recurringNotice: "Then ₹1,788/year (₹149/mo)",
+    popular: false,
     starterCredits: Number(process.env.PRO_PLUS_MONTHLY_CREDITS || 5000),
     monthlyCredits: Number(process.env.PRO_PLUS_MONTHLY_CREDITS || 5000),
     maxPdfSizeMB: 250,

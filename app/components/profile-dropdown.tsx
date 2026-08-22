@@ -74,7 +74,6 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
     window.location.reload();
   };
 
-  const planName = creditsData?.planName || "Free";
   const credits = creditsData ? creditsData.credits : 100;
 
   return (
@@ -121,9 +120,21 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
 
             {/* Plan & Credits Badges */}
             <div className="mt-2.5 flex items-center justify-between gap-1.5 rounded-xl bg-slate-50 p-2 border border-slate-100 text-xs">
-              <div className="flex items-center gap-1 font-semibold text-slate-700">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-500" />
-                <span>{planName} Plan</span>
+              <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                <span className={`inline-block h-2 w-2 rounded-full ${
+                  creditsData?.plan === "pro_plus"
+                    ? "bg-purple-600"
+                    : creditsData?.plan === "pro"
+                    ? "bg-sky-500"
+                    : "bg-emerald-500"
+                }`} />
+                <span>
+                  {creditsData?.plan === "pro_plus"
+                    ? "Pro Plus"
+                    : creditsData?.plan === "pro"
+                    ? "Pro Plan"
+                    : "Free Plan"}
+                </span>
               </div>
               <div className="rounded-lg bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">
                 {credits} credit{credits === 1 ? "" : "s"}

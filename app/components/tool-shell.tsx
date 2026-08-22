@@ -1,12 +1,13 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import SiteHeader from "./site-header";
 import Breadcrumbs from "./breadcrumbs";
 import FeedbackModal from "./feedback-modal";
 import { IconShield, IconBolt, IconFree, IconDevice, IconLock } from "./ui-icons";
 import { SUPPORT_EMAIL } from "@/lib/config";
+import { authClient } from "@/app/auth-client";
 
 export interface FaqItem {
   question: string;
@@ -18,6 +19,7 @@ interface ToolShellProps {
   title: string;
   badge?: string;
   description: string;
+  operationCost?: number;
   howItWorksSteps?: [string, string, string];
   faqs?: FaqItem[];
   relatedTools?: Array<{ name: string; href: string }>;
@@ -32,12 +34,12 @@ const DEFAULT_STEPS: [string, string, string] = [
 
 const DEFAULT_FAQS: FaqItem[] = [
   {
-    question: "Is this tool completely free to use?",
-    answer: "Yes, all Filevera utilities are 100% free with no subscriptions, credit cards, or hidden limits."
+    question: "How do processing credits work for this tool?",
+    answer: "Every operation uses a fixed number of server credits. Free accounts receive 100 starter credits and 50 renewal credits each month. Pro accounts receive 1,000 monthly credits."
   },
   {
     question: "Are my files secure and private?",
-    answer: "Yes. Files are processed securely in temporary server containers and immediately deleted after your operation completes."
+    answer: "Yes. Files are processed securely in isolated temporary server containers and immediately deleted after your operation completes."
   },
   {
     question: "Do I need to install any software or extensions?",
@@ -50,14 +52,30 @@ export default function ToolShell({
   title,
   badge = `${category} Tools`,
   description,
+  operationCost = 5,
   howItWorksSteps = DEFAULT_STEPS,
   faqs = DEFAULT_FAQS,
   relatedTools,
   children
 }: ToolShellProps) {
+  const { data: session } = authClient.useSession();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [feedbackVote, setFeedbackVote] = useState<"yes" | "no" | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [userCredits, setUserCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (session) {
+      fetch("/api/user/credits")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && typeof data.credits === "number") {
+            setUserCredits(data.credits);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session]);
 
   return (
     <main className="bg-slate-50 text-slate-900 flex-1 flex flex-col">
@@ -67,13 +85,37 @@ export default function ToolShell({
       <div className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 sm:py-7 flex-1">
         {/* Header Title Section */}
         <div className="text-center max-w-2xl mx-auto">
-          <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
-            {badge}
-          </span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
+              {badge}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              Cost: {operationCost} credits
+            </span>
+            {session && typeof userCredits === "number" && (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                userCredits < operationCost
+                  ? "bg-red-100 text-red-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}>
+                Balance: {userCredits} credits
+              </span>
+            )}
+          </div>
+
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl text-slate-900">{title}</h1>
           <p className="mt-1.5 text-xs sm:text-sm leading-5 text-slate-600">
             {description}
           </p>
+
+          {session && typeof userCredits === "number" && userCredits < operationCost && (
+            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs text-amber-800 shadow-2xs">
+              <span>You have {userCredits} credits remaining.</span>
+              <Link href="/pricing" className="font-bold underline text-sky-700 hover:text-sky-900">
+                Upgrade to Pro for 1,000 credits →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Compact Main Tool Process Card */}
@@ -104,8 +146,8 @@ export default function ToolShell({
               <IconFree className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-900">100% Free</p>
-              <p className="text-[11px] text-slate-500">No hidden fees</p>
+              <p className="text-xs font-semibold text-slate-900">Starter Credits</p>
+              <p className="text-[11px] text-slate-500">100 on signup</p>
             </div>
           </div>
           <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">

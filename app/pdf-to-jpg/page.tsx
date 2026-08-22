@@ -10,6 +10,8 @@ export default function PdfToJpgPage() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
+  const [creditInfo, setCreditInfo] = useState<{ used?: number; remaining?: number } | null>(null);
+
   const handleFile = (selected: File | undefined) => {
     if (!selected) return;
     if (!/\.pdf$/i.test(selected.name) && selected.type !== "application/pdf") {
@@ -44,6 +46,9 @@ export default function PdfToJpgPage() {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error || "Could not convert the PDF to JPG.");
       }
+      const creditsUsed = Number(response.headers.get("X-Credits-Used")) || 5;
+      const creditsRemaining = Number(response.headers.get("X-Credits-Remaining"));
+      setCreditInfo({ used: creditsUsed, remaining: isNaN(creditsRemaining) ? undefined : creditsRemaining });
       const blob = await response.blob();
       setDownloadUrl(URL.createObjectURL(blob));
     } catch (caught) {
@@ -136,11 +141,48 @@ export default function PdfToJpgPage() {
           </div>
         )}
 
-        {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">{error}</p>}
+        {error && (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+            <p className="font-semibold">{error}</p>
+            {error.includes("credit") && (
+              <div className="mt-2 flex items-center gap-2">
+                <a
+                  href="/pricing"
+                  className="rounded-lg bg-sky-500 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-600 shadow-2xs"
+                >
+                  Get Pro
+                </a>
+                <a
+                  href="/pricing"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Upgrade Plan
+                </a>
+              </div>
+            )}
+            {error.includes("log in") && (
+              <div className="mt-2">
+                <a
+                  href="/login"
+                  className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 shadow-2xs"
+                >
+                  Log In to Filevera
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {downloadUrl && (
           <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-center sm:text-left">
-            <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">JPG images ready</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">JPG images ready</h2>
+              {creditInfo && typeof creditInfo.used === "number" && (
+                <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                  ✓ {creditInfo.used} credits used {typeof creditInfo.remaining === "number" ? `• ${creditInfo.remaining} remaining` : ""}
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 text-xs text-emerald-900">Your PDF pages have been converted to JPG and compressed into a ZIP archive.</p>
             <div className="mt-2.5 flex flex-col sm:flex-row items-center gap-2.5">
               <a

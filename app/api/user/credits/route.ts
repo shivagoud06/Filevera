@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { ensureUserUsage } from "@/lib/credits";
+import { ensureUserUsage, getUserCreditHistory } from "@/lib/credits";
 import { getPlan } from "@/lib/plans";
+import { getUserSubscription, isUserIntroEligible } from "@/lib/subscriptions";
 
 export async function GET() {
   try {
@@ -13,7 +14,14 @@ export async function GET() {
     }
 
     const usage = await ensureUserUsage(session.user.id);
+    const sub = await getUserSubscription(session.user.id);
     const plan = getPlan(usage.plan);
+    const isProIntroEligible = await isUserIntroEligible(session.user.id, "pro");
+    const isProPlusIntroEligible = await isUserIntroEligible(session.user.id, "pro_plus");
+    const recentUsage = await getUserCreditHistory(session.user.id, 20);
+
+    const monthlyAllowance = plan.monthlyCredits;
+    const creditsUsedThisCycle = Math.max(0, monthlyAllowance - usage.credits);
 
     return NextResponse.json({
       userId: session.user.id,
@@ -22,6 +30,15 @@ export async function GET() {
       credits: usage.credits,
       creditsResetAt: usage.creditsResetAt,
       subscriptionStatus: usage.subscriptionStatus,
+      hasStripeCustomer: Boolean(sub?.stripeCustomerId),
+      cancelAtPeriodEnd: Boolean(sub?.cancelAtPeriodEnd),
+      currentPeriodEnd: sub?.currentPeriodEnd || null,
+      billingInterval: sub?.billingInterval || (usage.plan === "pro_plus" ? "year" : "month"),
+      isProIntroEligible,
+      isProPlusIntroEligible,
+      monthlyAllowance,
+      creditsUsedThisCycle,
+      recentUsage,
       planDetails: plan,
     });
   } catch {

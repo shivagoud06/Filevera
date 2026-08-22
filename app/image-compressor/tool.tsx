@@ -96,6 +96,8 @@ export default function ImageCompressorTool({
     addFiles(event.dataTransfer.files);
   };
 
+  const [creditInfo, setCreditInfo] = useState<{ used?: number; remaining?: number } | null>(null);
+
   const compress = async () => {
     if (!items.length || processing) return;
     setProcessing(true);
@@ -111,10 +113,14 @@ export default function ImageCompressorTool({
         method: "POST",
         body: form,
       });
-      const payload = (await response.json()) as { error?: string; results?: Result[]; zip?: string };
+      const payload = (await response.json()) as { error?: string; results?: Result[]; zip?: string; creditsUsed?: number; creditsRemaining?: number };
       if (!response.ok || !payload.results || !payload.zip) {
         throw new Error(payload.error || "Image compression failed.");
       }
+
+      const creditsUsed = payload.creditsUsed ?? Number(response.headers.get("X-Credits-Used")) ?? 5;
+      const creditsRemaining = payload.creditsRemaining ?? Number(response.headers.get("X-Credits-Remaining"));
+      setCreditInfo({ used: creditsUsed, remaining: isNaN(creditsRemaining) ? undefined : creditsRemaining });
 
       const binary = atob(payload.zip);
       const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -223,20 +229,50 @@ export default function ImageCompressorTool({
         )}
 
         {error && (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">
-            {error}
-          </p>
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+            <p className="font-semibold">{error}</p>
+            {error.includes("credit") && (
+              <div className="mt-2 flex items-center gap-2">
+                <a
+                  href="/pricing"
+                  className="rounded-lg bg-sky-500 px-3 py-1 text-xs font-semibold text-white hover:bg-sky-600 shadow-2xs"
+                >
+                  Get Pro
+                </a>
+                <a
+                  href="/pricing"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Upgrade Plan
+                </a>
+              </div>
+            )}
+            {error.includes("log in") && (
+              <div className="mt-2">
+                <a
+                  href="/login"
+                  className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800 shadow-2xs"
+                >
+                  Log In to Filevera
+                </a>
+              </div>
+            )}
+          </div>
         )}
 
         {results.length > 0 && (
-          <div className="mt-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4">
-            <div className="flex items-center gap-2">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 text-xs font-bold">✓</span>
-              <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">
-                {results.every((result) => result.reachedTarget) ? "Target reached" : "Best achievable compression ready"}
-              </h2>
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs sm:text-sm font-semibold text-emerald-950">Compression complete</h2>
+              {creditInfo && typeof creditInfo.used === "number" && (
+                <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                  ✓ {creditInfo.used} credits used {typeof creditInfo.remaining === "number" ? `• ${creditInfo.remaining} remaining` : ""}
+                </span>
+              )}
             </div>
-            <p className="mt-0.5 text-xs text-emerald-900">Target limit: {targetValue} {targetUnit}</p>
+            <p className="mt-0.5 text-xs text-emerald-900">
+              {results.length} image{results.length === 1 ? "" : "s"} compressed successfully.
+            </p>
 
             <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 rounded-lg bg-white/90 p-2.5 border border-emerald-100">
               <div>
