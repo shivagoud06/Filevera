@@ -30,6 +30,9 @@ export default function SplitPdfPage() {
     handleFile(event.dataTransfer.files?.[0]);
   };
 
+  const [downloadFilename, setDownloadFilename] = useState<string>("split-pages.zip");
+  const [isZipResult, setIsZipResult] = useState<boolean>(true);
+
   const split = async () => {
     if (!file || processing) return;
     setProcessing(true);
@@ -46,6 +49,15 @@ export default function SplitPdfPage() {
       const creditsUsed = Number(response.headers.get("X-Credits-Used")) || 5;
       const creditsRemaining = Number(response.headers.get("X-Credits-Remaining"));
       setCreditInfo({ used: creditsUsed, remaining: isNaN(creditsRemaining) ? undefined : creditsRemaining });
+
+      const contentType = response.headers.get("Content-Type") || "";
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+      const filename = filenameMatch ? filenameMatch[1] : (contentType.includes("zip") ? "split-pages.zip" : "page.pdf");
+      const isZip = contentType.includes("zip") || filename.endsWith(".zip");
+
+      setDownloadFilename(filename);
+      setIsZipResult(isZip);
       const blob = await response.blob();
       setDownloadUrl(URL.createObjectURL(blob));
     } catch (caught) {
@@ -200,10 +212,10 @@ export default function SplitPdfPage() {
             <div className="mt-2.5 flex flex-col sm:flex-row items-center gap-2.5">
               <a
                 href={downloadUrl}
-                download="split-pages.zip"
+                download={downloadFilename || (isZipResult ? "split-pages.zip" : "page.pdf")}
                 className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
               >
-                Download ZIP
+                {isZipResult ? "Download ZIP" : "Download"}
               </a>
               <button
                 type="button"

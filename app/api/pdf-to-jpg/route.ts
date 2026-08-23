@@ -65,9 +65,36 @@ export async function POST(request: Request) {
 
     const pdfData = new Uint8Array(await file.arrayBuffer());
     const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-    const zip = new JSZip();
     const pageCount = Math.min(pdf.numPages, 20);
+    if (pageCount === 1) {
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+      const context = canvas.getContext("2d") as unknown as CanvasRenderingContext2D;
+      context.fillStyle = "white";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      await (page.render({
+        canvas: canvas as unknown as HTMLCanvasElement,
+        canvasContext: context,
+        viewport,
+      } as unknown as Parameters<typeof page.render>[0])).promise;
+      const jpeg = canvas.toBuffer("image/jpeg", 0.9);
 
+      // Commit usage record
+      await commitCreditUsage(session.user.id, "pdf_to_jpg", deduction.required, deduction.remaining);
+
+      return new Response(Buffer.from(jpeg), {
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Content-Disposition": 'attachment; filename="page-1.jpg"',
+          "Cache-Control": "no-store",
+          "X-Credits-Used": String(deduction.required),
+          "X-Credits-Remaining": String(deduction.remaining),
+        },
+      });
+    }
+
+    const zip = new JSZip();
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1.5 });

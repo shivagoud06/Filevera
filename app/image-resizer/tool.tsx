@@ -374,11 +374,23 @@ export default function ImageResizerTool() {
                         </div>
 
                         <div className="mt-3 flex flex-col sm:flex-row items-center gap-2.5">
-                            {zipUrl && (
-                                <a href={zipUrl} download="resized-images.zip" className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs">
-                                    Download all as ZIP
+                            {results.length === 1 ? (
+                                <a
+                                    href={imageUrl(results[0].data, results[0].name)}
+                                    download={results[0].name}
+                                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                >
+                                    Download
                                 </a>
-                            )}
+                            ) : zipUrl ? (
+                                <a
+                                    href={zipUrl}
+                                    download="resized-images.zip"
+                                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                >
+                                    Download ZIP
+                                </a>
+                            ) : null}
                             <button
                                 type="button"
                                 onClick={() => { setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } }}

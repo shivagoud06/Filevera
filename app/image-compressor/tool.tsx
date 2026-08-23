@@ -96,6 +96,7 @@ export default function ImageCompressorTool({
     addFiles(event.dataTransfer.files);
   };
 
+  const [singleDownloadUrl, setSingleDownloadUrl] = useState<string>("");
   const [creditInfo, setCreditInfo] = useState<{ used?: number; remaining?: number } | null>(null);
 
   const compress = async () => {
@@ -122,10 +123,19 @@ export default function ImageCompressorTool({
       const creditsRemaining = payload.creditsRemaining ?? Number(response.headers.get("X-Credits-Remaining"));
       setCreditInfo({ used: creditsUsed, remaining: isNaN(creditsRemaining) ? undefined : creditsRemaining });
 
-      const binary = atob(payload.zip);
-      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      if (payload.results.length === 1) {
+        const singleItem = payload.results[0];
+        const ext = singleItem.name.split('.').pop()?.toLowerCase();
+        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const imgBytes = Uint8Array.from(atob(singleItem.data), (c) => c.charCodeAt(0));
+        setSingleDownloadUrl(URL.createObjectURL(new Blob([imgBytes], { type: mime })));
+      } else {
+        const binary = atob(payload.zip);
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        setZipUrl(URL.createObjectURL(new Blob([bytes], { type: "application/zip" })));
+      }
+
       setResults(payload.results);
-      setZipUrl(URL.createObjectURL(new Blob([bytes], { type: "application/zip" })));
       trackToolEvent("processing_success", "compress-image");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Image compression failed.");
@@ -304,14 +314,41 @@ export default function ImageCompressorTool({
               ))}
             </div>
 
-            {zipUrl && (
+            {(singleDownloadUrl || zipUrl) && (
               <div className="mt-3 flex flex-col sm:flex-row items-center gap-2.5">
-                <a href={zipUrl} download="compressed-images.zip" onClick={() => trackToolEvent("download", "compress-image")} className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs">
-                  Download ZIP
-                </a>
+                {results.length === 1 && singleDownloadUrl ? (
+                  <a
+                    href={singleDownloadUrl}
+                    download={results[0].name}
+                    onClick={() => trackToolEvent("download", "compress-image")}
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                  >
+                    Download
+                  </a>
+                ) : zipUrl ? (
+                  <a
+                    href={zipUrl}
+                    download="compressed-images.zip"
+                    onClick={() => trackToolEvent("download", "compress-image")}
+                    className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                  >
+                    Download ZIP
+                  </a>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => { setItems([]); setResults([]); if (zipUrl) { URL.revokeObjectURL(zipUrl); setZipUrl(""); } }}
+                  onClick={() => {
+                    setItems([]);
+                    setResults([]);
+                    if (singleDownloadUrl) {
+                      URL.revokeObjectURL(singleDownloadUrl);
+                      setSingleDownloadUrl("");
+                    }
+                    if (zipUrl) {
+                      URL.revokeObjectURL(zipUrl);
+                      setZipUrl("");
+                    }
+                  }}
                   className="text-xs font-medium text-emerald-800 underline underline-offset-4 hover:text-emerald-950"
                 >
                   Compress more images

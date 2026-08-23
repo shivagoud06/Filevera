@@ -88,6 +88,27 @@ export async function POST(request: Request) {
       return errorResponse(`The selected pages must be between 1 and ${maxPages}.`, 400);
     }
 
+    if (selected.length === 1) {
+      const pageNumber = selected[0];
+      const extracted = await PDFDocument.create();
+      const [page] = await extracted.copyPages(source, [pageNumber - 1]);
+      extracted.addPage(page);
+      const pdfBytes = await extracted.save();
+
+      // Commit usage record
+      await commitCreditUsage(session.user.id, "split_pdf", deduction.required, deduction.remaining);
+
+      return new Response(Buffer.from(pdfBytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="page-${pageNumber}.pdf"`,
+          "Cache-Control": "no-store",
+          "X-Credits-Used": String(deduction.required),
+          "X-Credits-Remaining": String(deduction.remaining),
+        },
+      });
+    }
+
     const zip = new JSZip();
     for (const pageNumber of selected) {
       const extracted = await PDFDocument.create();
