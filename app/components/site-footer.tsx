@@ -47,6 +47,7 @@ export default function SiteFooter() {
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">Support & Community</h3>
                     <ul className="mt-3 space-y-2 text-xs">
                         <li><Link href="/support" className="text-slate-600 hover:text-sky-600 transition-colors">Customer Support</Link></li>
+                        <li><a href="mailto:filevera@gmail.com" className="text-slate-600 hover:text-sky-600 transition-colors">filevera@gmail.com</a></li>
                         <li><Link href="/contact" className="text-slate-600 hover:text-sky-600 transition-colors">Contact</Link></li>
                         <li><Link href="/#faq" className="text-slate-600 hover:text-sky-600 transition-colors">FAQ</Link></li>
                         <li><Link href="/feedback" className="text-slate-600 hover:text-sky-600 transition-colors">Reviews & Feedback</Link></li>

@@ -214,14 +214,21 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
                                 type="button"
                                 onClick={compress}
                                 disabled={isProcessing || !file || !targetBytes}
+                                aria-busy={isProcessing}
+                                aria-label={isProcessing ? "Compressing PDF" : "Compress PDF"}
                                 className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 shadow-2xs"
                             >
                                 {isProcessing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
-                                {isProcessing ? "Compressing PDF..." : "Compress PDF"}
+                                <span>{isProcessing ? "Compressing PDF…" : "Compress PDF"}</span>
                             </button>
+                            <div className="mt-1.5 flex items-center gap-2">
+                                <span className="text-[11px] font-medium text-slate-500">
+                                    <span className="text-amber-500 font-bold">⚡</span> 5 credits required
+                                </span>
+                            </div>
                             {isProcessing && (
                                 <p className="mt-1.5 text-center text-xs text-slate-500" role="status">
-                                    Testing multi-pass compression settings...
+                                    Optimizing PDF structure and stream objects…
                                 </p>
                             )}
                         </div>

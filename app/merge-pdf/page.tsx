@@ -147,6 +147,7 @@ export default function MergePdfPage() {
                   <div className="flex items-center gap-2 truncate min-w-0">
                     <span className="font-bold text-slate-400">{idx + 1}.</span>
                     <span className="truncate font-medium text-slate-800">{file.name}</span>
+                    <span className="shrink-0 text-[11px] text-slate-400">({(file.size / 1024).toFixed(0)} KB)</span>
                   </div>
                   <button
                     type="button"
@@ -164,13 +165,25 @@ export default function MergePdfPage() {
                 type="button"
                 disabled={processing || files.length < 2}
                 onClick={merge}
+                aria-busy={processing}
+                aria-label={processing ? "Merging PDFs" : `Merge ${files.length} PDFs`}
                 className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 shadow-2xs"
               >
                 {processing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
-                {processing ? "Merging PDFs…" : `Merge ${files.length} PDFs`}
+                <span>{processing ? "Merging PDFs…" : `Merge ${files.length} PDFs`}</span>
               </button>
-              {files.length < 2 && (
-                <p className="mt-1.5 text-[11px] text-slate-500">Select at least 2 PDF files to merge</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">
+                  <span className="text-amber-500 font-bold">⚡</span> 5 credits required
+                </span>
+              </div>
+              {processing && (
+                <p className="mt-1.5 text-center text-xs text-slate-500" role="status">
+                  Combining pages and writing merged PDF…
+                </p>
+              )}
+              {files.length < 2 && !processing && (
+                <p className="mt-1 text-[11px] text-slate-500">Select at least 2 PDF files to merge</p>
               )}
             </div>
           </div>

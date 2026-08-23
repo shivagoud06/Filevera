@@ -245,11 +245,23 @@ export default function ImageCompressorTool({
                 type="button"
                 onClick={compress}
                 disabled={processing || !items.length || !targetBytes}
-                className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-wait disabled:bg-slate-300 shadow-2xs"
+                aria-busy={processing}
+                aria-label={processing ? "Compressing images" : `Compress ${items.length} images`}
+                className="flex h-11 w-full sm:w-auto sm:min-w-[220px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 text-xs sm:text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 shadow-2xs"
               >
                 {processing && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" />}
-                {processing ? "Compressing images..." : `Compress ${items.length} image${items.length === 1 ? "" : "s"}`}
+                <span>{processing ? "Compressing images…" : `Compress ${items.length} image${items.length === 1 ? "" : "s"}`}</span>
               </button>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className="text-[11px] font-medium text-slate-500">
+                  <span className="text-amber-500 font-bold">⚡</span> 5 credits required
+                </span>
+              </div>
+              {processing && (
+                <p className="mt-1.5 text-center text-xs text-slate-500" role="status">
+                  Compressing and optimizing image data…
+                </p>
+              )}
             </div>
           </div>
         )}
