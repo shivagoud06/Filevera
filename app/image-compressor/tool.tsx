@@ -25,6 +25,12 @@ function reduction(original: number, compressed: number) {
   return Math.max(0, ((original - compressed) / original) * 100).toFixed(1);
 }
 
+function imageDataUrl(data: string, name: string) {
+  const ext = name.split(".").pop()?.toLowerCase();
+  const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+  return `data:${mime};base64,${data}`;
+}
+
 export default function ImageCompressorTool({
   initialValue = "1",
   initialUnit = "MB",
@@ -305,11 +311,23 @@ export default function ImageCompressorTool({
 
             <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 max-h-40 overflow-y-auto pr-1">
               {results.map((result) => (
-                <div key={result.name} className="rounded-lg border border-emerald-200 bg-white p-2 text-xs">
-                  <p className="truncate font-semibold text-slate-900">{result.name}</p>
-                  <p className="mt-0.5 text-slate-500">
-                    {formatFileSize(result.originalSize)} → <span className="font-medium text-emerald-700">{formatFileSize(result.compressedSize)}</span>
-                  </p>
+                <div key={result.name} className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white p-2 text-xs">
+                  <div className="min-w-0 flex-1 truncate pr-2">
+                    <p className="truncate font-semibold text-slate-900">{result.name}</p>
+                    <p className="mt-0.5 text-slate-500">
+                      {formatFileSize(result.originalSize)} → <span className="font-medium text-emerald-700">{formatFileSize(result.compressedSize)}</span>
+                    </p>
+                  </div>
+                  {results.length > 1 && (
+                    <a
+                      href={imageDataUrl(result.data, result.name)}
+                      download={result.name}
+                      onClick={() => trackToolEvent("download", "compress-image")}
+                      className="shrink-0 rounded px-2 py-1 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-700 transition-colors shadow-2xs"
+                    >
+                      Download
+                    </a>
+                  )}
                 </div>
               ))}
             </div>

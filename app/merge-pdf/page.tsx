@@ -213,7 +213,7 @@ export default function MergePdfPage() {
                 download="merged.pdf"
                 className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-5 text-xs sm:text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
               >
-                Download Merged PDF
+                Download
               </a>
               <button
                 type="button"
