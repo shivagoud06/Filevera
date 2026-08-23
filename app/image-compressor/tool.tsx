@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, DragEvent, useMemo, useState } from "react";
+import { validateImageFile, deduplicateFiles } from "@/lib/file-validation";
 import TargetSizeInput from "@/app/components/target-size-input";
 import ToolShell from "@/app/components/tool-shell";
 import { bytesFromTargetSize, formatFileSize, TargetUnit } from "@/lib/target-size";
@@ -63,18 +64,27 @@ export default function ImageCompressorTool({
   const addFiles = (incoming: FileList | File[]) => {
     const selected = Array.from(incoming);
     if (!selected.length) return;
-    if (items.length + selected.length > MAX_IMAGES) {
+
+    for (const file of selected) {
+      const val = validateImageFile(file);
+      if (!val.valid) {
+        setError(`${file.name} — ${val.error}: ${val.errorDetail || ""}`);
+        return;
+      }
+    }
+
+    const { unique, duplicatesCount } = deduplicateFiles(items, selected);
+    if (!unique.length && duplicatesCount > 0) {
+      setError("The selected image(s) have already been added.");
+      return;
+    }
+
+    if (items.length + unique.length > MAX_IMAGES) {
       setError(`Choose no more than ${MAX_IMAGES} images.`);
       return;
     }
 
-    const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) && !/\.(jpe?g|png|webp)$/i.test(file.name));
-    if (invalid) {
-      setError(`${invalid.name} is not a supported JPG, PNG, or WebP image.`);
-      return;
-    }
-
-    setItems((current) => [...current, ...selected]);
+    setItems((current) => [...current, ...unique]);
     trackToolEvent("upload_started", "compress-image");
     setError("");
     setResults([]);

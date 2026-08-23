@@ -5,8 +5,8 @@ import TargetSizeInput from "@/app/components/target-size-input";
 import ToolShell from "@/app/components/tool-shell";
 import { bytesFromTargetSize, formatFileSize, TargetUnit } from "@/lib/target-size";
 import { trackToolEvent } from "@/lib/analytics";
+import { validatePdfFile } from "@/lib/file-validation";
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const PRESET_VALUES = { "500kb": ["500", "KB"], "1mb": ["1", "MB"], "2mb": ["2", "MB"], "5mb": ["5", "MB"] } as const;
 
 type Result = {
@@ -19,14 +19,14 @@ type Result = {
     creditsRemaining?: number;
 };
 
-function reduction(original: number, compressed: number) {
-    return Math.max(0, ((original - compressed) / original) * 100).toFixed(1);
-}
-
 async function looksLikePdf(file: File) {
     const sample = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
     const text = new TextDecoder("ascii").decode(sample);
     return text.includes("%PDF-");
+}
+
+function reduction(original: number, compressed: number) {
+    return Math.max(0, ((original - compressed) / original) * 100).toFixed(1);
 }
 
 export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initialTarget?: keyof typeof PRESET_VALUES }) {
@@ -38,7 +38,7 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
     const [error, setError] = useState("");
     const [result, setResult] = useState<Result | null>(null);
     const targetBytes = bytesFromTargetSize(targetValue, targetUnit);
-    const targetError = !targetValue.trim() ? "Target size is required." : targetBytes ? "" : "Enter a positive number up to 100 MB.";
+    const targetError = !targetValue.trim() ? "Target size is required." : targetBytes ? "" : "Enter a positive number up to 50 MB.";
     const downloadName = file ? `${file.name.replace(/\.pdf$/i, "") || "compressed"}-compressed.pdf` : "compressed.pdf";
 
     useEffect(() => () => {
@@ -49,21 +49,14 @@ export default function CompressPdfToSizeTool({ initialTarget = "1mb" }: { initi
         setError("");
         setResult(null);
         if (!selectedFile) return;
-        if (!selectedFile.name.toLowerCase().endsWith(".pdf") || selectedFile.type !== "application/pdf") {
+
+        const val = validatePdfFile(selectedFile);
+        if (!val.valid) {
             setFile(null);
-            setError("Please choose a PDF file with a .pdf extension.");
+            setError(`${val.error}${val.errorDetail ? ": " + val.errorDetail : ""}`);
             return;
         }
-        if (selectedFile.size === 0) {
-            setFile(null);
-            setError("The selected file is empty.");
-            return;
-        }
-        if (selectedFile.size > MAX_UPLOAD_BYTES) {
-            setFile(null);
-            setError("Files must be 25 MB or smaller.");
-            return;
-        }
+
         if (!(await looksLikePdf(selectedFile))) {
             setFile(null);
             setError("This file does not appear to be a valid PDF.");

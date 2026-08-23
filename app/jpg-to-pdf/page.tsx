@@ -2,8 +2,9 @@
 
 import { ChangeEvent, DragEvent, useState } from "react";
 import ToolShell from "@/app/components/tool-shell";
+import { validateImageFile, deduplicateFiles } from "@/lib/file-validation";
 
-const ACCEPT = "image/jpeg,image/png,.jpg,.jpeg,.png";
+const ACCEPT = "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp";
 const MAX_IMAGES = 20;
 
 export default function JpgToPdfPage() {
@@ -16,16 +17,27 @@ export default function JpgToPdfPage() {
   const addFiles = (incoming: FileList | File[]) => {
     const selected = Array.from(incoming);
     if (!selected.length) return;
-    if (files.length + selected.length > MAX_IMAGES) {
+
+    for (const file of selected) {
+      const val = validateImageFile(file);
+      if (!val.valid) {
+        setError(`${file.name} — ${val.error}: ${val.errorDetail || ""}`);
+        return;
+      }
+    }
+
+    const { unique, duplicatesCount } = deduplicateFiles(files, selected);
+    if (!unique.length && duplicatesCount > 0) {
+      setError("The selected image(s) have already been added.");
+      return;
+    }
+
+    if (files.length + unique.length > MAX_IMAGES) {
       setError(`Choose up to ${MAX_IMAGES} images.`);
       return;
     }
-    const invalid = selected.find((file) => !["image/jpeg", "image/png"].includes(file.type) && !/\.(jpe?g|png)$/i.test(file.name));
-    if (invalid) {
-      setError(`${invalid.name} is not a valid JPG or PNG image.`);
-      return;
-    }
-    setFiles((current) => [...current, ...selected]);
+
+    setFiles((current) => [...current, ...unique]);
     setError("");
     setDownloadUrl("");
   };

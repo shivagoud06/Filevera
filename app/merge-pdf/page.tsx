@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, useState } from "react";
 import ToolShell from "@/app/components/tool-shell";
+import { validatePdfFile, deduplicateFiles } from "@/lib/file-validation";
 
 const MAX_FILES = 10;
 
@@ -16,16 +17,27 @@ export default function MergePdfPage() {
   const addFiles = (incoming: FileList | File[]) => {
     const selected = Array.from(incoming);
     if (!selected.length) return;
-    if (files.length + selected.length > MAX_FILES) {
+
+    for (const file of selected) {
+      const val = validatePdfFile(file);
+      if (!val.valid) {
+        setError(`${file.name} — ${val.error}: ${val.errorDetail || ""}`);
+        return;
+      }
+    }
+
+    const { unique, duplicatesCount } = deduplicateFiles(files, selected);
+    if (!unique.length && duplicatesCount > 0) {
+      setError("The selected PDF(s) have already been added.");
+      return;
+    }
+
+    if (files.length + unique.length > MAX_FILES) {
       setError(`Choose up to ${MAX_FILES} PDFs.`);
       return;
     }
-    const invalid = selected.find((file) => !/\.pdf$/i.test(file.name) && file.type !== "application/pdf");
-    if (invalid) {
-      setError(`${invalid.name} is not a valid PDF file.`);
-      return;
-    }
-    setFiles((current) => [...current, ...selected]);
+
+    setFiles((current) => [...current, ...unique]);
     setError("");
     setDownloadUrl("");
   };

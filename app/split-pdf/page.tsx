@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, useState } from "react";
 import ToolShell from "@/app/components/tool-shell";
+import { validatePdfFile } from "@/lib/file-validation";
 
 export default function SplitPdfPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,8 +16,9 @@ export default function SplitPdfPage() {
 
   const handleFile = (selected: File | undefined) => {
     if (!selected) return;
-    if (!/\.pdf$/i.test(selected.name) && selected.type !== "application/pdf") {
-      setError("Please choose a valid PDF file.");
+    const val = validatePdfFile(selected);
+    if (!val.valid) {
+      setError(`${val.error}: ${val.errorDetail || ""}`);
       return;
     }
     setFile(selected);

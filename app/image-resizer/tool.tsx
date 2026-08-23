@@ -2,6 +2,7 @@
 
 import { ChangeEvent, DragEvent, useEffect, useState } from "react";
 import ToolShell from "@/app/components/tool-shell";
+import { validateImageFile, deduplicateFiles } from "@/lib/file-validation";
 
 const MAX_COUNT = 20;
 const ACCEPT = "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp";
@@ -51,16 +52,28 @@ export default function ImageResizerTool() {
             setZipUrl("");
         }
         const selected = Array.from(files);
-        if (items.length + selected.length > MAX_COUNT) {
+        if (!selected.length) return;
+
+        for (const file of selected) {
+            const val = validateImageFile(file);
+            if (!val.valid) {
+                setError(`${file.name} — ${val.error}: ${val.errorDetail || ""}`);
+                return;
+            }
+        }
+
+        const { unique, duplicatesCount } = deduplicateFiles(items.map((i) => i.file), selected);
+        if (!unique.length && duplicatesCount > 0) {
+            setError("The selected image(s) have already been added.");
+            return;
+        }
+
+        if (items.length + unique.length > MAX_COUNT) {
             setError(`Choose no more than ${MAX_COUNT} images.`);
             return;
         }
-        const invalid = selected.find((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || !/\.(jpe?g|png|webp)$/i.test(file.name));
-        if (invalid) {
-            setError(`${invalid.name} is not a supported image.`);
-            return;
-        }
-        setItems((current) => [...current, ...selected.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, preview: URL.createObjectURL(file) }))]);
+
+        setItems((current) => [...current, ...unique.map((file) => ({ id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`, file, preview: URL.createObjectURL(file) }))]);
     };
 
     const choose = (event: ChangeEvent<HTMLInputElement>) => {
