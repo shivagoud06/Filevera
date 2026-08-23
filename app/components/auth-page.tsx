@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import AuthForm from "./auth-form";
 import AuthShell from "./auth-shell";
 import { SUPPORT_EMAIL } from "@/lib/config";
@@ -17,7 +18,9 @@ export default function AuthPage({ mode, googleConfigured = false }: { mode: "lo
                 <p className="mt-1.5 text-xs sm:text-sm leading-5 text-slate-600">
                     {isSignup ? "Save your place for future file work. Basic tools remain free & anonymous." : "Sign in to your Filevera account."}
                 </p>
-                <AuthForm mode={mode} googleConfigured={googleConfigured} />
+                <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-slate-50" />}>
+                    <AuthForm mode={mode} googleConfigured={googleConfigured} />
+                </Suspense>
                 <p className="mt-4 text-center text-xs text-slate-600">
                     {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
                     <Link href={isSignup ? "/login" : "/signup"} className="font-semibold text-sky-600 hover:underline">

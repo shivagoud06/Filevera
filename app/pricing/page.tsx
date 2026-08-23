@@ -51,7 +51,21 @@ function PricingContent() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
 
-
+  // UPI QR Code State
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [activeQrPlan, setActiveQrPlan] = useState<"pro" | "pro_plus" | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrSuccess, setQrSuccess] = useState(false);
+  const [qrData, setQrData] = useState<{
+    qrId: string;
+    imageUrl: string;
+    amount: number;
+    currency: string;
+    plan: "pro" | "pro_plus";
+    planName: string;
+    closeBy: number;
+  } | null>(null);
 
   // Fetch real user credits & subscription info
   useEffect(() => {
@@ -77,6 +91,117 @@ function PricingContent() {
   useEffect(() => {
     void loadRazorpayScript();
   }, []);
+
+  // Cleanup scroll lock on unmount
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, []);
+
+  // QR Code Payment Status Poller
+  useEffect(() => {
+    if (!qrModalOpen || !qrData || qrSuccess) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/payment/qr-status?qrId=${qrData.qrId}`);
+        const data = await res.json();
+        if (res.ok && data.status === "paid") {
+          setQrSuccess(true);
+          setPaymentSuccess(
+            `Payment successful ✓ Welcome to Filevera ${qrData.plan === "pro_plus" ? "Pro Plus" : "Pro"}! Your plan is now active.`
+          );
+          setCurrentPlan(qrData.plan);
+          clearInterval(intervalId);
+
+          setTimeout(() => {
+            setQrModalOpen(false);
+            setQrData(null);
+            router.push("/account");
+          }, 2000);
+        }
+      } catch (err) {
+        console.error("QR status poll error:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [qrModalOpen, qrData, qrSuccess, router]);
+
+  const lockPageScroll = () => {
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
+  };
+
+  const unlockPageScroll = () => {
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    }
+  };
+
+  const closeQrModal = () => {
+    setQrModalOpen(false);
+    setQrLoading(false);
+    setQrError(null);
+    setQrData(null);
+    setQrSuccess(false);
+    setActiveQrPlan(null);
+  };
+
+  const handleStartQrCheckout = async (planId: "pro" | "pro_plus") => {
+    setPaymentError(null);
+    setPaymentSuccess(null);
+    setQrError(null);
+    setQrSuccess(false);
+    setQrData(null);
+
+    if (!session) {
+      router.push(`/login?redirect=/pricing?plan=${planId}`);
+      return;
+    }
+
+    if (planId === currentPlan) {
+      return;
+    }
+
+    setActiveQrPlan(planId);
+    setQrModalOpen(true);
+    setQrLoading(true);
+
+    try {
+      const res = await fetch("/api/payment/create-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setQrError(data.error || "Could not generate Razorpay UPI QR code.");
+        setQrLoading(false);
+        return;
+      }
+
+      setQrData({
+        qrId: data.qrId,
+        imageUrl: data.imageUrl,
+        amount: data.amount,
+        currency: data.currency || "INR",
+        plan: data.plan,
+        planName: data.planName,
+        closeBy: data.closeBy,
+      });
+      setQrLoading(false);
+    } catch {
+      setQrError("An error occurred while connecting to Razorpay QR service.");
+      setQrLoading(false);
+    }
+  };
 
   const handleStartCheckout = async (planId: "pro" | "pro_plus") => {
     setPaymentError(null);
@@ -120,15 +245,16 @@ function PricingContent() {
         return;
       }
 
-      const options: Record<string, unknown> = {
+      // Lock page scroll to keep Razorpay checkout and confirmation dialog centered in viewport
+      lockPageScroll();
+
+      const baseOptions = {
         key: data.keyId,
-        amount: data.amount,
-        currency: data.currency || "INR",
         name: "Filevera",
-        description: `${data.planName} Subscription`,
+        description: data.subscriptionId
+          ? `${data.planName} Subscription`
+          : `${data.planName} Plan`,
         image: "/favicon.ico",
-        order_id: data.orderId || undefined,
-        subscription_id: data.subscriptionId || undefined,
         prefill: {
           name: session.user.name || undefined,
           email: session.user.email,
@@ -136,8 +262,23 @@ function PricingContent() {
         theme: {
           color: "#0284c7",
         },
+        retry: {
+          enabled: true,
+          max_count: 4,
+        },
+        send_sms_hash: true,
+        notes: {
+          plan: planId,
+          userId: session.user.id,
+        },
         modal: {
+          backdropclose: false,
+          escape: true,
+          handleback: true,
+          confirm_close: true,
+          animation: true,
           ondismiss: () => {
+            unlockPageScroll();
             setLoadingPlan(null);
           },
         },
@@ -147,6 +288,7 @@ function PricingContent() {
           razorpay_subscription_id?: string;
           razorpay_signature?: string;
         }) => {
+          unlockPageScroll();
           setLoadingPlan(planId);
           try {
             const verifyRes = await fetch("/api/payment/verify", {
@@ -183,13 +325,33 @@ function PricingContent() {
         },
       };
 
+      // Strict subscription vs order checkout parameters
+      const options: Record<string, unknown> = data.subscriptionId
+        ? {
+            ...baseOptions,
+            subscription_id: data.subscriptionId,
+          }
+        : {
+            ...baseOptions,
+            order_id: data.orderId,
+            amount: data.amount,
+            currency: data.currency || "INR",
+          };
+
       const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", () => {
-        setPaymentError("Payment was not completed. Your current plan has not changed.");
+      rzp.on("payment.failed", (res: unknown) => {
+        unlockPageScroll();
+        const errorObj = (res && typeof res === "object" && "error" in res) ? (res as { error?: { description?: string; reason?: string } }).error : undefined;
+        const desc =
+          errorObj?.description ||
+          errorObj?.reason ||
+          "Payment was not completed. Your current plan has not changed.";
+        setPaymentError(desc);
         setLoadingPlan(null);
       });
       rzp.open();
     } catch {
+      unlockPageScroll();
       setPaymentError("An error occurred while launching secure checkout. Please try again.");
       setLoadingPlan(null);
     }
@@ -369,7 +531,7 @@ function PricingContent() {
               </div>
             </div>
 
-            <div className="mt-8 pt-4 border-t border-slate-100">
+            <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col gap-2">
               {currentPlan === "pro" ? (
                 <button
                   type="button"
@@ -379,21 +541,32 @@ function PricingContent() {
                   ✓ Current Plan
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => handleStartCheckout("pro")}
-                  disabled={loadingPlan !== null}
-                  className="w-full rounded-2xl bg-sky-500 py-3 text-xs font-bold text-white hover:bg-sky-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loadingPlan === "pro" ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Opening secure checkout...</span>
-                    </>
-                  ) : (
-                    <span>{isProIntro ? "Get Pro for ₹99" : "Get Pro"}</span>
-                  )}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleStartCheckout("pro")}
+                    disabled={loadingPlan !== null || qrLoading}
+                    className="w-full rounded-2xl bg-sky-500 py-3 text-xs font-bold text-white hover:bg-sky-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loadingPlan === "pro" ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Opening secure checkout...</span>
+                      </>
+                    ) : (
+                      <span>{isProIntro ? "Get Pro for ₹99" : "Get Pro"}</span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStartQrCheckout("pro")}
+                    disabled={loadingPlan !== null || qrLoading}
+                    className="w-full rounded-2xl border border-sky-200 bg-sky-50/60 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-100/80 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                  >
+                    <span>⚡ Pay with UPI QR</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -466,7 +639,7 @@ function PricingContent() {
               </div>
             </div>
 
-            <div className="mt-8 pt-4 border-t border-slate-100">
+            <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col gap-2">
               {currentPlan === "pro_plus" ? (
                 <button
                   type="button"
@@ -476,27 +649,38 @@ function PricingContent() {
                   ✓ Current Plan
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => handleStartCheckout("pro_plus")}
-                  disabled={loadingPlan !== null}
-                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loadingPlan === "pro_plus" ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Opening secure checkout...</span>
-                    </>
-                  ) : (
-                    <span>
-                      {currentPlan === "pro"
-                        ? "Upgrade to Pro Plus"
-                        : isProPlusIntro
-                        ? "Get Pro Plus for ₹1,499"
-                        : "Get Pro Plus"}
-                    </span>
-                  )}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleStartCheckout("pro_plus")}
+                    disabled={loadingPlan !== null || qrLoading}
+                    className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-bold text-white hover:bg-purple-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loadingPlan === "pro_plus" ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Opening secure checkout...</span>
+                      </>
+                    ) : (
+                      <span>
+                        {currentPlan === "pro"
+                          ? "Upgrade to Pro Plus"
+                          : isProPlusIntro
+                          ? "Get Pro Plus for ₹1,499"
+                          : "Get Pro Plus"}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleStartQrCheckout("pro_plus")}
+                    disabled={loadingPlan !== null || qrLoading}
+                    className="w-full rounded-2xl border border-purple-200 bg-purple-50/60 py-2.5 text-xs font-bold text-purple-800 hover:bg-purple-100/80 transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                  >
+                    <span>⚡ Pay with UPI QR</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -573,13 +757,142 @@ function PricingContent() {
             </div>
             <div>
               <p className="text-xs font-bold text-slate-900">256-Bit SSL Encrypted Checkout</p>
-              <p className="text-[11px] text-slate-500">Powered by Razorpay. Supports UPI, Google Pay, Cards & Net Banking.</p>
+              <p className="text-[11px] text-slate-500">Powered by Razorpay. Supports UPI (Google Pay, PhonePe, Paytm, BHIM, QR), Cards (Domestic & International Visa, Mastercard, Amex), Netbanking & Wallets.</p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
             <span>Cancel anytime from your account</span>
           </div>
         </div>
+
+        {/* Razorpay UPI QR Modal */}
+        {qrModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 text-center flex flex-col items-center">
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={closeQrModal}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+                aria-label="Close UPI QR modal"
+              >
+                ✕
+              </button>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800">
+                ⚡ Instant UPI QR Payment
+              </span>
+
+              <h3 className="mt-3 text-xl font-bold text-slate-900">
+                {activeQrPlan === "pro_plus" ? "Filevera Pro Plus" : "Filevera Pro"}
+              </h3>
+
+              {qrLoading && (
+                <div className="my-10 flex flex-col items-center gap-3">
+                  <span className="h-8 w-8 animate-spin rounded-full border-3 border-sky-500 border-t-transparent" />
+                  <p className="text-xs text-slate-600 font-medium">
+                    Generating official Razorpay UPI QR...
+                  </p>
+                </div>
+              )}
+
+              {qrError && (
+                <div className="my-6 w-full rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-xs text-amber-900">
+                  <p className="font-bold text-amber-950">UPI QR Notice</p>
+                  <p className="mt-1 text-amber-800 leading-relaxed">{qrError}</p>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const plan = activeQrPlan;
+                        closeQrModal();
+                        if (plan) handleStartCheckout(plan);
+                      }}
+                      className="w-full rounded-xl bg-sky-500 py-2.5 text-xs font-bold text-white hover:bg-sky-600 transition-colors shadow-xs"
+                    >
+                      Use Standard Razorpay Checkout
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeQrModal}
+                      className="w-full rounded-xl border border-slate-300 bg-white py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {qrData && !qrSuccess && (
+                <>
+                  <div className="mt-2 text-2xl font-extrabold text-slate-900">
+                    ₹{(qrData.amount / 100).toLocaleString("en-IN")}
+                    <span className="text-xs font-normal text-slate-500 ml-1">
+                      {qrData.plan === "pro_plus" ? "/ first year" : "/ first month"}
+                    </span>
+                  </div>
+
+                  {/* QR Image Box */}
+                  <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl shadow-inner flex flex-col items-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={qrData.imageUrl}
+                      alt="Razorpay UPI QR Code"
+                      className="w-48 h-48 object-contain rounded-lg bg-white p-1"
+                    />
+                    <p className="mt-2 text-[11px] font-semibold text-slate-600">
+                      Scan with any UPI App
+                    </p>
+                    <div className="mt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        GPay
+                      </span>
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        PhonePe
+                      </span>
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        Paytm
+                      </span>
+                      <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        BHIM
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live Status Indicator */}
+                  <div className="mt-4 flex items-center gap-2 text-xs text-sky-700 bg-sky-50 px-3 py-1.5 rounded-full border border-sky-200">
+                    <span className="h-2 w-2 rounded-full bg-sky-500 animate-ping shrink-0" />
+                    <span className="font-medium">
+                      Waiting for payment confirmation...
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-[11px] text-slate-500">
+                    Your plan activates automatically once payment is verified by Razorpay.
+                  </p>
+                </>
+              )}
+
+              {qrSuccess && (
+                <div className="my-8 flex flex-col items-center text-center">
+                  <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl font-bold">
+                    ✓
+                  </div>
+                  <h4 className="mt-3 text-lg font-bold text-slate-900">
+                    Payment Confirmed!
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Your Filevera subscription is now active. Redirecting...
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -172,7 +172,7 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
             </Link>
 
             <Link
-              href="/account#usage"
+              href="/account/usage"
               onClick={() => setIsOpen(false)}
               role="menuitem"
               className="flex items-center gap-2.5 rounded-xl px-3 py-2 hover:bg-slate-50 hover:text-sky-600 transition-colors"
@@ -208,7 +208,7 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
             </Link>
 
             <Link
-              href="/account#settings"
+              href="/account/settings"
               onClick={() => setIsOpen(false)}
               role="menuitem"
               className="flex items-center gap-2.5 rounded-xl px-3 py-2 hover:bg-slate-50 hover:text-sky-600 transition-colors"

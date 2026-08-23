@@ -6,5 +6,5 @@ export const authClient = createAuthClient({
   baseURL:
     typeof window !== "undefined"
       ? window.location.origin
-      : process.env.NEXT_PUBLIC_SITE_URL || "https://filevera-shivagoud06s-projects.vercel.app",
+      : process.env.NEXT_PUBLIC_SITE_URL || "https://fileveraio.vercel.app",
 });

@@ -175,6 +175,41 @@ export async function ensureDbInitialized(): Promise<void> {
             "createdAt" BIGINT NOT NULL
           );
 
+          -- Safe column migrations for existing tables
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "provider" TEXT NOT NULL DEFAULT 'razorpay';
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "providerSubscriptionId" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "providerPaymentId" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "plan" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "subscriptionStatus" TEXT NOT NULL DEFAULT 'active';
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "stripePriceId" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "billingInterval" TEXT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "introOfferUsed" BOOLEAN NOT NULL DEFAULT FALSE;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "currentPeriodStart" BIGINT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "currentPeriodEnd" BIGINT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "cancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT FALSE;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "createdAt" BIGINT;
+          ALTER TABLE "subscription" ADD COLUMN IF NOT EXISTS "updatedAt" BIGINT;
+
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "provider" TEXT NOT NULL DEFAULT 'razorpay';
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "providerPaymentId" TEXT;
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "subscriptionId" TEXT;
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "amount" INTEGER;
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'INR';
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "status" TEXT;
+          ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "createdAt" BIGINT;
+
+          ALTER TABLE "user_usage" ADD COLUMN IF NOT EXISTS "plan" TEXT NOT NULL DEFAULT 'free';
+          ALTER TABLE "user_usage" ADD COLUMN IF NOT EXISTS "credits" INTEGER NOT NULL DEFAULT 100;
+          ALTER TABLE "user_usage" ADD COLUMN IF NOT EXISTS "creditsResetAt" BIGINT;
+          ALTER TABLE "user_usage" ADD COLUMN IF NOT EXISTS "subscriptionStatus" TEXT NOT NULL DEFAULT 'active';
+          ALTER TABLE "user_usage" ADD COLUMN IF NOT EXISTS "updatedAt" BIGINT;
+
+          CREATE INDEX IF NOT EXISTS idx_subscription_user_id ON subscription("userId");
+          CREATE INDEX IF NOT EXISTS idx_subscription_provider_sub ON subscription("providerSubscriptionId");
+          CREATE INDEX IF NOT EXISTS idx_subscription_stripe_sub ON subscription("stripeSubscriptionId");
+          CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments("userId");
           CREATE INDEX IF NOT EXISTS idx_credit_usage_user_id ON credit_usage("userId");
           CREATE INDEX IF NOT EXISTS idx_credit_usage_created_at ON credit_usage("createdAt" DESC);
         `);

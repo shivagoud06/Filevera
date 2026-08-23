@@ -39,62 +39,67 @@ export async function POST(request: Request) {
     const isIntroEligible = await isUserIntroEligible(session.user.id, plan);
     const amountPaise = isIntroEligible ? config.introAmountPaise : config.regularAmountPaise;
 
+    if (!isRazorpayConfigured || !razorpay || !RAZORPAY_KEY_ID) {
+      return NextResponse.json(
+        {
+          error:
+            "Razorpay payment gateway is not configured on the server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+        },
+        { status: 503 }
+      );
+    }
+
     let orderId: string | null = null;
     let subscriptionId: string | null = null;
 
-    if (razorpay) {
-      const razorpayPlanId = getRazorpayPlanId(plan, isIntroEligible);
+    const razorpayPlanId = getRazorpayPlanId(plan, isIntroEligible);
 
-      if (razorpayPlanId) {
-        try {
-          const sub = await razorpay.subscriptions.create({
-            plan_id: razorpayPlanId,
-            total_count: plan === "pro_plus" ? 5 : 12,
-            quantity: 1,
-            customer_notify: 1,
-            notes: {
-              userId: session.user.id,
-              userEmail: session.user.email,
-              plan,
-              isIntroEligible: String(isIntroEligible),
-            },
-          });
-          subscriptionId = sub.id;
-        } catch (subErr) {
-          console.warn("Razorpay subscription creation failed, falling back to order creation:", subErr);
-        }
+    if (razorpayPlanId) {
+      try {
+        const sub = await razorpay.subscriptions.create({
+          plan_id: razorpayPlanId,
+          total_count: plan === "pro_plus" ? 5 : 12,
+          quantity: 1,
+          customer_notify: 1,
+          notes: {
+            userId: session.user.id,
+            userEmail: session.user.email,
+            plan,
+            isIntroEligible: String(isIntroEligible),
+          },
+        });
+        subscriptionId = sub.id;
+      } catch (subErr) {
+        console.warn("Razorpay subscription creation failed, falling back to order creation:", subErr);
       }
+    }
 
-      // If no subscriptionId created or planId was not specified, create an Order
-      if (!subscriptionId) {
-        try {
-          const order = await razorpay.orders.create({
-            amount: amountPaise,
-            currency: "INR",
-            receipt: `rcpt_${session.user.id.slice(0, 8)}_${Date.now().toString().slice(-6)}`,
-            notes: {
-              userId: session.user.id,
-              userEmail: session.user.email,
-              plan,
-              isIntroEligible: String(isIntroEligible),
-            },
-          });
-          orderId = order.id;
-        } catch (err) {
-          console.error("Razorpay order creation error:", err);
-          return NextResponse.json(
-            { error: "Unable to create Razorpay payment order. Please check merchant credentials." },
-            { status: 500 }
-          );
-        }
+    // Fallback: If subscription plan is not available, create an Order
+    if (!subscriptionId) {
+      try {
+        const order = await razorpay.orders.create({
+          amount: amountPaise,
+          currency: "INR",
+          receipt: `rcpt_${session.user.id.slice(0, 8)}_${Date.now().toString().slice(-6)}`,
+          notes: {
+            userId: session.user.id,
+            userEmail: session.user.email,
+            plan,
+            isIntroEligible: String(isIntroEligible),
+          },
+        });
+        orderId = order.id;
+      } catch (err) {
+        console.error("Razorpay order creation error:", err);
+        return NextResponse.json(
+          { error: "Unable to create Razorpay payment order. Please check merchant credentials and plan configuration." },
+          { status: 500 }
+        );
       }
-    } else {
-      // In development / missing keys fallback mock ID for testing
-      orderId = `order_test_${Date.now()}`;
     }
 
     return NextResponse.json({
-      keyId: RAZORPAY_KEY_ID || "rzp_test_placeholder",
+      keyId: RAZORPAY_KEY_ID,
       orderId,
       subscriptionId,
       amount: amountPaise,
@@ -102,7 +107,7 @@ export async function POST(request: Request) {
       plan,
       planName: config.planName,
       isIntroEligible,
-      isTestMode: !isRazorpayConfigured,
+      isTestMode: RAZORPAY_KEY_ID.startsWith("rzp_test_"),
       user: {
         id: session.user.id,
         name: session.user.name,

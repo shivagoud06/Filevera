@@ -36,24 +36,26 @@ export async function POST(request: Request) {
     const paymentEntity = payload.payload?.payment?.entity;
     const subscriptionEntity = payload.payload?.subscription?.entity;
     const orderEntity = payload.payload?.order?.entity;
+    const qrEntity = payload.payload?.qr_code?.entity;
 
-    const notes = paymentEntity?.notes || subscriptionEntity?.notes || orderEntity?.notes || {};
+    const notes = paymentEntity?.notes || subscriptionEntity?.notes || orderEntity?.notes || qrEntity?.notes || {};
     const userId = notes.userId;
     const plan = (notes.plan === "pro_plus" ? "pro_plus" : "pro") as "pro" | "pro_plus";
     const isIntro = notes.isIntroEligible === "true";
 
     switch (eventType) {
+      case "qr_code.credited":
       case "payment.captured":
       case "order.paid": {
         if (userId) {
-          const paymentId = paymentEntity?.id || orderEntity?.id || eventId;
-          const amount = paymentEntity?.amount || orderEntity?.amount || 0;
+          const paymentId = paymentEntity?.id || qrEntity?.id || orderEntity?.id || eventId;
+          const amount = paymentEntity?.amount || qrEntity?.payments_amount_received || orderEntity?.amount || 0;
 
           await recordPayment({
             userId,
             provider: "razorpay",
             providerPaymentId: paymentId,
-            subscriptionId: subscriptionEntity?.id || null,
+            subscriptionId: subscriptionEntity?.id || qrEntity?.id || null,
             amount,
             currency: paymentEntity?.currency || "INR",
             status: "captured",
@@ -62,7 +64,7 @@ export async function POST(request: Request) {
           await activateSubscription({
             userId,
             provider: "razorpay",
-            providerSubscriptionId: subscriptionEntity?.id || null,
+            providerSubscriptionId: subscriptionEntity?.id || qrEntity?.id || null,
             providerPaymentId: paymentId,
             plan,
             billingInterval: plan === "pro_plus" ? "year" : "month",
@@ -99,10 +101,18 @@ export async function POST(request: Request) {
           const now = Date.now();
           await dbQuery(
             `UPDATE subscription 
-             SET "subscriptionStatus" = 'canceled', "updatedAt" = $1 
+             SET "subscriptionStatus" = 'canceled', "cancelAtPeriodEnd" = true, "updatedAt" = $1 
              WHERE "providerSubscriptionId" = $2`,
             [now, subscriptionEntity.id]
           );
+          if (userId) {
+            await dbQuery(
+              `UPDATE user_usage 
+               SET "subscriptionStatus" = 'canceled', "updatedAt" = $1 
+               WHERE "userId" = $2`,
+              [now, userId]
+            );
+          }
         }
         break;
       }

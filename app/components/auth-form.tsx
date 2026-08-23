@@ -1,9 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { authClient } from "@/app/auth-client";
+
+function getOAuthMessage(searchParams: ReturnType<typeof useSearchParams>): string {
+    const errorParam = searchParams.get("error");
+    const errorDescParam = searchParams.get("error_description");
+    if (!errorParam) return "";
+
+    const normalizedError = errorParam.toLowerCase();
+    const normalizedDesc = (errorDescParam || "").toLowerCase();
+
+    if (
+        normalizedError === "access_denied" ||
+        normalizedError === "cancelled" ||
+        normalizedError === "canceled" ||
+        normalizedDesc.includes("access_denied") ||
+        normalizedDesc.includes("cancelled") ||
+        normalizedDesc.includes("canceled")
+    ) {
+        return "Google sign-in was cancelled.";
+    }
+    if (
+        normalizedError === "redirect_uri_mismatch" ||
+        normalizedDesc.includes("redirect_uri_mismatch")
+    ) {
+        return "Google sign-in configuration error: Redirect URI mismatch. Please verify Google OAuth settings.";
+    }
+    if (normalizedError === "account_already_linked_to_different_user") {
+        return "This Google account is already linked to a different Filevera account.";
+    }
+    if (normalizedError === "email_not_verified") {
+        return "Your Google account email is not verified. Please verify your email with Google first.";
+    }
+    if (normalizedError === "state_not_found" || normalizedError === "state_mismatch") {
+        return "Sign-in session expired. Please try signing in with Google again.";
+    }
+    return errorDescParam || "Google sign-in could not be completed. Please try again.";
+}
 
 export default function AuthForm({ mode, googleConfigured = false }: { mode: "login" | "signup"; googleConfigured?: boolean }) {
     const isSignup = mode === "signup";
@@ -15,14 +51,19 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [pending, setPending] = useState(false);
+    const [googlePending, setGooglePending] = useState(false);
     const [agreed, setAgreed] = useState(false);
-    const [googleMessage, setGoogleMessage] = useState("");
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const [clientGoogleMessage, setClientGoogleMessage] = useState<string | null>(null);
+
+    const googleMessage = clientGoogleMessage !== null ? clientGoogleMessage : getOAuthMessage(searchParams);
 
     const submit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError("");
         setSuccess("");
+        setClientGoogleMessage("");
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError("Please enter a valid email address.");
         if (password.length < 8) return setError("Password must be at least 8 characters.");
         if (isSignup && password !== confirmPassword) return setError("Passwords do not match.");
@@ -43,16 +84,27 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
     };
 
     const signInWithGoogle = async () => {
-        setGoogleMessage("");
+        setError("");
+        setSuccess("");
+        setClientGoogleMessage("");
         if (!googleConfigured) {
-            setGoogleMessage("Google sign-in is currently unavailable. Please use email and password.");
+            setClientGoogleMessage("Google sign-in is currently unavailable. Please use email and password.");
             return;
         }
-        setPending(true);
-        const result = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
-        if (result.error) {
-            setGoogleMessage("Google sign-in is currently unavailable. Please try again later.");
-            setPending(false);
+        setGooglePending(true);
+        try {
+            const result = await authClient.signIn.social({
+                provider: "google",
+                callbackURL: "/",
+                errorCallbackURL: isSignup ? "/signup" : "/login",
+            });
+            if (result?.error) {
+                setClientGoogleMessage("Google sign-in is currently unavailable. Please try again later.");
+                setGooglePending(false);
+            }
+        } catch (caught) {
+            setClientGoogleMessage(caught instanceof Error ? caught.message : "Unable to complete Google sign-in. Please try again.");
+            setGooglePending(false);
         }
     };
 
@@ -134,7 +186,7 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
             {success && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-700">{success}</p>}
             <button
                 type="submit"
-                disabled={pending}
+                disabled={pending || googlePending}
                 className="h-10 sm:h-11 w-full rounded-xl bg-sky-500 px-4 text-sm font-semibold text-white hover:bg-sky-600 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-wait disabled:bg-slate-400"
             >
                 {pending ? (isSignup ? "Creating account..." : "Signing in...") : (isSignup ? "Create account" : "Log in")}
@@ -152,17 +204,29 @@ export default function AuthForm({ mode, googleConfigured = false }: { mode: "lo
             <button
                 type="button"
                 onClick={() => void signInWithGoogle()}
-                disabled={pending}
+                disabled={pending || googlePending}
                 aria-label="Continue with Google"
                 className="relative flex h-10 sm:h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-wait disabled:opacity-60 shadow-2xs"
             >
-                <svg className="absolute left-3.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#4285F4" d="M21.35 12.23c0-.71-.06-1.4-.18-2.05H12v3.88h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.22Z" />
-                    <path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.35l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.74 9.74 0 0 0 12 21.7Z" />
-                    <path fill="#FBBC05" d="M6.54 13.79a5.86 5.86 0 0 1 0-3.58V7.68H3.3a9.74 9.74 0 0 0 0 8.64l3.24-2.53Z" />
-                    <path fill="#EA4335" d="M12 6.18c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.27 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.7 5.38l3.24 2.53C7.31 7.9 9.46 6.18 12 6.18Z" />
-                </svg>
-                <span>Continue with Google</span>
+                {googlePending ? (
+                    <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 animate-spin text-slate-600" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Connecting to Google...</span>
+                    </div>
+                ) : (
+                    <>
+                        <svg className="absolute left-3.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill="#4285F4" d="M21.35 12.23c0-.71-.06-1.4-.18-2.05H12v3.88h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.22Z" />
+                            <path fill="#34A853" d="M12 21.7c2.63 0 4.84-.87 6.45-2.35l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.74 9.74 0 0 0 12 21.7Z" />
+                            <path fill="#FBBC05" d="M6.54 13.79a5.86 5.86 0 0 1 0-3.58V7.68H3.3a9.74 9.74 0 0 0 0 8.64l3.24-2.53Z" />
+                            <path fill="#EA4335" d="M12 6.18c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.27 14.63 2.3 12 2.3a9.74 9.74 0 0 0-8.7 5.38l3.24 2.53C7.31 7.9 9.46 6.18 12 6.18Z" />
+                        </svg>
+                        <span>Continue with Google</span>
+                    </>
+                )}
             </button>
             {googleMessage && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 leading-4">{googleMessage}</p>}
         </form>

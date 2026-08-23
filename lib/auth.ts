@@ -7,6 +7,7 @@ const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 // Explicit trusted production and preview origins
 const trustedOrigins: string[] = [
+  "https://fileveraio.vercel.app",
   "https://filevera-shivagoud06s-projects.vercel.app",
   "https://*.vercel.app",
   "http://localhost:3000",
@@ -50,13 +51,14 @@ const fallbackBaseURL =
   process.env.BETTER_AUTH_URL ||
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
-  "https://filevera-shivagoud06s-projects.vercel.app";
+  "https://fileveraio.vercel.app";
 
 export const auth = betterAuth({
   database: pool,
   secret: process.env.BETTER_AUTH_SECRET ?? randomBytes(32).toString("hex"),
   baseURL: {
     allowedHosts: [
+      "fileveraio.vercel.app",
       "filevera-shivagoud06s-projects.vercel.app",
       "*.vercel.app",
       "localhost:3000",
@@ -69,6 +71,9 @@ export const auth = betterAuth({
     fallback: fallbackBaseURL,
   },
   trustedOrigins,
+  onAPIError: {
+    errorURL: "/login",
+  },
   account: {
     accountLinking: {
       enabled: true,
@@ -86,6 +91,7 @@ export const auth = betterAuth({
             clientId: googleClientId,
             clientSecret: googleClientSecret,
             prompt: "select_account",
+            accessType: "offline",
           },
         }
       : undefined,

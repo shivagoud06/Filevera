@@ -28,6 +28,48 @@ interface FaqItem {
   answer: string;
 }
 
+interface ApplicationStats {
+  filesProcessed: number;
+  happyUsers: number;
+  toolsCount: number;
+  uptime: number | null;
+}
+
+function AnimatedCounter({ value }: { value: number | null }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (value === null || value === undefined || value === 0) return;
+
+    const end = value;
+    const duration = 750;
+    const startTime = performance.now();
+
+    const updateCounter = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(end * easeOut);
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(updateCounter);
+      } else {
+        setDisplayValue(end);
+      }
+    };
+
+    const animFrame = requestAnimationFrame(updateCounter);
+    return () => cancelAnimationFrame(animFrame);
+  }, [value]);
+
+  if (value === null || value === undefined) {
+    return <span>...</span>;
+  }
+
+  return <span>{displayValue.toLocaleString()}</span>;
+}
+
 const FAQS: FaqItem[] = [
   {
     question: "Is Filevera free to use?",
@@ -120,6 +162,8 @@ export default function HomePage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([]);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [stats, setStats] = useState<ApplicationStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
   const activeCategories = toolCategories.filter((category) => toolsInCategory(category).length > 0);
 
   const fetchFeedback = () => {
@@ -135,6 +179,13 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchFeedback();
+    fetch("/api/stats")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStats(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
   }, []);
 
   return (
@@ -528,19 +579,27 @@ export default function HomePage() {
       <section className="bg-white border-y border-slate-200/80 px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto max-w-5xl grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
           <div className="p-3">
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">10M+</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+              {loadingStats ? "..." : <AnimatedCounter value={stats?.filesProcessed ?? 0} />}
+            </p>
             <p className="mt-0.5 text-xs text-slate-500 font-medium">Files processed</p>
           </div>
           <div className="p-3">
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">100K+</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+              {loadingStats ? "..." : <AnimatedCounter value={stats?.happyUsers ?? 0} />}
+            </p>
             <p className="mt-0.5 text-xs text-slate-500 font-medium">Happy users</p>
           </div>
           <div className="p-3">
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">100+</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+              {loadingStats ? "..." : <AnimatedCounter value={stats?.toolsCount ?? 16} />}
+            </p>
             <p className="mt-0.5 text-xs text-slate-500 font-medium">Target presets & tools</p>
           </div>
           <div className="p-3">
-            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">99.9%</p>
+            <p className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+              {loadingStats ? "..." : stats?.uptime !== null && stats?.uptime !== undefined ? `${stats.uptime}%` : "—"}
+            </p>
             <p className="mt-0.5 text-xs text-slate-500 font-medium">Uptime reliability</p>
           </div>
         </div>

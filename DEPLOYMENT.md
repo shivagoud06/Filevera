@@ -39,10 +39,10 @@ Filevera uses **Better Auth** with native OpenID Connect / OAuth 2.0 for Google 
    - Name: `Filevera Web Client`.
    - **Authorized JavaScript origins**:
      - Development: `http://localhost:3000`
-     - Production: `https://your-domain.com` (your configured `NEXT_PUBLIC_SITE_URL`)
+     - Production: `https://fileveraio.vercel.app` (or your custom `NEXT_PUBLIC_SITE_URL`)
    - **Authorized redirect URIs**:
      - Development: `http://localhost:3000/api/auth/callback/google`
-     - Production: `https://your-domain.com/api/auth/callback/google`
+     - Production: `https://fileveraio.vercel.app/api/auth/callback/google`
 5. Copy the generated **Client ID** and **Client Secret** into your `.env.local` or hosting environment variables:
    ```env
    GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
@@ -53,9 +53,8 @@ Filevera uses **Better Auth** with native OpenID Connect / OAuth 2.0 for Google 
 
 ## Authentication Architecture & Security
 
-- **Library**: `better-auth` v1.7.1
-- **Database**: SQLite with persistent storage via `better-sqlite3` at `AUTH_DATABASE_PATH`.
-- **Session Handling**: Cryptographically signed HttpOnly session cookies with automatic token rotation.
+- **Library**: `better-auth`
+- **Database**: PostgreSQL with connection pooling and automated schema initialization via `DATABASE_URL`.
+- **Session Handling**: Cryptographically signed HttpOnly session cookies with automatic token rotation and session isolation.
 - **Account Linking**: Enabled for trusted `google` provider. If a user registers with email/password and later clicks *Continue with Google* using the same verified email, the accounts are linked without duplicating user records.
-- **Anonymous Access**: All file processing tools remain 100% free and accessible without login. Authentication is strictly optional for users.
 - **Error Handling**: Graceful fallback when Google credentials are not configured, displaying user-friendly notices without exposing stack traces or internal endpoints.
